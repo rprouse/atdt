@@ -7,8 +7,7 @@ import 'package:atdt/ingest/normalize.dart';
 import 'package:atdt/ingest/phile_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-List<String> _lines(String text, [TextEncoding enc = TextEncoding.utf8]) =>
-    normalizeText(text, encoding: enc).lines;
+List<String> _lines(String text) => normalizeText(text).lines;
 
 void main() {
   group('decodeBytes', () {
@@ -102,14 +101,22 @@ void main() {
       expect(_lines('a'), ['a']);
     });
 
-    test('a lone ESC that starts no sequence becomes a placeholder', () {
-      final r = normalizeText('x\x1Bqy\n', encoding: TextEncoding.utf8);
-      expect(r.lines, ['x${controlPlaceholder}qy']);
+    test('a lone ESC is the CP437 left-arrow glyph', () {
+      final r = normalizeText('x\x1Bqy\n');
+      expect(r.lines, ['x←qy']);
       expect(r.controls.ansiSequences, 0);
+      expect(r.controls.controlGlyphs, 1);
     });
 
-    test('in CP437 files a lone ESC is the left-arrow glyph', () {
-      expect(_lines('x\x1Bqy\n', TextEncoding.cp437), ['x←qy']);
+    test('ESC used in art keeps the character after it', () {
+      // From Phrack 22/4: two-byte escape stripping would eat the '_'.
+      expect(_lines('\x1B___/\x1B_\n'), ['←___/←_']);
+    });
+
+    test('a ^Z ending a line is dropped', () {
+      final r = normalizeText('part one\x1A\npart two\n');
+      expect(r.lines, ['part one', 'part two']);
+      expect(r.controls.eofPadding, 1);
     });
 
     test('C1 controls become placeholders', () {
@@ -117,16 +124,13 @@ void main() {
     });
 
     test('columns count code points, not UTF-16 units', () {
-      final r = normalizeText('\u{1F600}\tx\n', encoding: TextEncoding.utf8);
+      final r = normalizeText('\u{1F600}\tx\n');
       expect(r.lines.single, '\u{1F600}       x');
       expect(r.longestLineColumns, 9);
     });
 
     test('only trailing ^Z and NUL are padding', () {
-      final r = normalizeText(
-        'a\x1Ab\n\x1A\x00\x1A',
-        encoding: TextEncoding.cp437,
-      );
+      final r = normalizeText('a\x1Ab\n\x1A\x00\x1A');
       expect(r.lines, ['a→b']);
       expect(r.controls.eofPadding, 3);
     });

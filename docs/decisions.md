@@ -18,8 +18,8 @@ Each entry records:
 | A | Licence of VileR's Ultimate Oldschool PC Font Pack | Verified 2026-10-16 |
 | A | Scroll structure choice | Decided 2026-10-16; confirm at the decision gate |
 | A | Horizontal insets that stay put when system bars hide | Decided 2026-10-16; check on device |
-| B | CP437 vs Latin-1 heuristic against the real archive | Open |
-| B | YAML front matter added to archive `.txt` files | Found 2026-10-16; handle in Stage B |
+| B | CP437 vs Latin-1 heuristic against the real archive | Verified 2026-10-16 (archive is all UTF-8; heuristic kept as fallback) |
+| B | YAML front matter added to archive `.txt` files | Handled 2026-10-16 |
 | C | Archive URL pattern, format, and metadata location | Partly verified 2026-10-16 (tarball contents beyond issue 1 still open) |
 | E | Licence of each candidate font | Open (JetBrains Mono, BigBlue TerminalPlus and C64 Pro Mono verified) |
 | G | Flutter selection behaviour in lazily built lists | Open |
@@ -31,7 +31,7 @@ Each entry records:
 | A | Licence of the vector monospace font (SIL OFL, ships ligatures) | Open |
 | A | Licence of VileR's Ultimate Oldschool PC Font Pack (believed CC BY-SA 4.0) | Open |
 | A | Scroll structure choice (`TwoDimensionalScrollView` vs nested scroll views) | Open |
-| B | CP437 vs Latin-1 heuristic against the real archive | Open |
+| B | CP437 vs Latin-1 heuristic against the real archive | Verified 2026-10-16 (archive is all UTF-8; heuristic kept as fallback) |
 | C | Archive URL pattern, format, and metadata location | Open |
 | E | Licence of each candidate font | Open |
 | G | Flutter selection behaviour in lazily built lists | Open |
@@ -122,3 +122,25 @@ Each entry records:
   - Added an About dialog (chrome info button) with each font's credit. Each font's shipped licence file is registered with Flutter's `LicenseRegistry`, so "View licenses" shows the full texts. Tests check both.
   - The integer-scale code path and its unit tests stay in the layout calculator. The spec keeps it as a core rule and Stage E's manifest has the flag; no bundled font sets it today.
   - **Release constraint:** C64 Pro Mono can only ship while ATDT is free. Any paid tier needs a licence from Style, or the font must be removed from that build.
+
+## 2026-10-16: Stage B ingestion against the real archive
+
+- **Checked:** ran `tool/ingest_archive.dart` over all 72 issue tarballs (1,026 philes). Then scanned the raw files for conversion damage (U+FFFD, UTF-8-read-as-Latin-1 mojibake) and for every control character, with its context.
+- **Found:**
+  - **Every phile is valid UTF-8.** The maintainers have converted the archive: box drawing appears as real Unicode (1,899 box characters), and there is no U+FFFD or mojibake. The CP437 / Latin-1 heuristic never fires on the live source.
+  - **Every phile has front matter** with a title and an author (1,026/1,026).
+  - **C0 bytes survived the conversion as raw bytes** in 26 philes (305 characters), and they look like DOS display glyphs:
+    - ESC in 22/4 and 22/5 is border art: `/|←/|←…` and `←|/`, probably backslashes mangled long ago, but aligned as one column each.
+    - 0x03 ♥ appears in 6 philes, 0x14 ¶ in 3, and 0x18/0x19 ↑↓ in diagrams.
+    - 0x1F appears in 46/19, 46/20, 46/23 and 48/3 as WordStar soft hyphens at line ends (`dif
+ferent`).
+  - **No real ANSI escape sequences exist.** The 4 "sequences" my first version stripped were false positives: `ESC _` and `ESC O` in art. Stripping them deleted the following art character and shifted the art by two columns.
+  - **^Z:** 26 philes end with a single ^Z (trailing padding), and 6 have a ^Z at a line end where concatenated parts meet (46/15, 46/16, 46/18, 46/25, 46/26 and 55/3).
+  - Form feeds: 5, all in 50/6.
+  - **Size:** median 474 lines and 79 columns. 15% of philes exceed 80 columns, and the widest is 559 (62/6). **71/7 is 16.4 million characters (265,732 lines)**; ingesting it takes 1.9 s on a desktop JIT.
+- **Changed:**
+  - **The spec says "other C0 controls become a visible placeholder". C0 bytes and DEL now show as their CP437 glyphs in every encoding instead.** That is how DOS displayed them, and it keeps art and symbols intact. The `∙` placeholder (U+2219, present in every bundled font) is kept for NUL (blank in CP437) and C1 controls. Soft hyphens therefore show as `▼` at line ends, faithful to DOS if not to WordStar.
+  - ANSI stripping is limited to full CSI sequences (`ESC [ … final`). A bare ESC is a `←` glyph.
+  - A ^Z immediately before a line break is dropped (DOS stopped reading there), as well as trailing ^Z/NUL padding.
+  - The decoding heuristic (CP437 when box-drawing bytes appear outside words; Latin-1 when accented letters sit inside them; Windows-1252 when bytes 0x80–0x9F are prose punctuation) stays as the fallback for non-UTF-8 sources. It is covered by fixtures. Ambiguous decisions are flagged on `PhileText.encodingAmbiguous` and in the CSV; none occur in the archive.
+  - **For Stage C:** import must run off the UI isolate (71/7 alone takes seconds on a phone). Line-offset storage must cope with philes over 16 MB.

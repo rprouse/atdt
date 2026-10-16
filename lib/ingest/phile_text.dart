@@ -25,6 +25,7 @@ class ControlCounts {
     this.ansiSequences = 0,
     this.formFeeds = 0,
     this.placeholders = 0,
+    this.controlGlyphs = 0,
     this.eofPadding = 0,
   });
 
@@ -34,10 +35,13 @@ class ControlCounts {
   /// Form feeds turned into empty lines.
   final int formFeeds;
 
-  /// Control characters shown as [controlPlaceholder].
+  /// NUL and C1 controls shown as the placeholder.
   final int placeholders;
 
-  /// Trailing ^Z / NUL padding bytes dropped.
+  /// C0 bytes and DEL shown as their CP437 glyphs (♥ ← ¶ …).
+  final int controlGlyphs;
+
+  /// ^Z end-of-file marks and trailing ^Z/NUL padding dropped.
   final int eofPadding;
 }
 
@@ -56,7 +60,7 @@ class PhileText {
   factory PhileText.fromBytes(List<int> bytes) {
     final split = splitFrontMatter(bytes);
     final decoded = decodeBytes(split?.body ?? bytes);
-    final normalized = normalizeText(decoded.text, encoding: decoded.encoding);
+    final normalized = normalizeText(decoded.text);
     return PhileText(
       lines: normalized.lines,
       longestLineColumns: normalized.longestLineColumns,

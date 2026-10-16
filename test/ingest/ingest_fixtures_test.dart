@@ -90,8 +90,11 @@ void main() {
     test('c0_controls.txt', () {
       final t = _ingest('c0_controls.txt');
       expect(t.encoding, TextEncoding.utf8);
-      expect(t.lines, ['bell$_p back${_p}space nul$_p del$_p end']);
-      expect(t.controls.placeholders, 4);
+      // BEL, BS and DEL as CP437 glyphs; NUL (blank in CP437) as the
+      // placeholder.
+      expect(t.lines, ['bell• back◘space nul$_p del⌂ end']);
+      expect(t.controls.controlGlyphs, 3);
+      expect(t.controls.placeholders, 1);
     });
 
     test('eof_padding.txt', () {

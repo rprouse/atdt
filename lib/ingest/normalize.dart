@@ -5,7 +5,7 @@ library;
 import 'dart:math' as math;
 
 import 'code_pages.dart';
-import 'phile_text.dart';
+import 'phile_text.dart' show ControlCounts;
 
 const int tabStop = 8;
 
@@ -23,17 +23,26 @@ class NormalizeResult {
   final ControlCounts controls;
 }
 
-// CSI sequences (ESC [ params intermediates final) and two-byte Fe escapes.
-final _ansi = RegExp(r'\x1B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])');
+// Only CSI sequences (ESC [ params intermediates final) are stripped. In the
+// archive, a bare ESC is usually art drawn with the CP437 "←" glyph
+// (`ESC___/`), so two-byte escapes would eat real characters.
+final _ansi = RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]');
 final _lineBreak = RegExp('\r\n|\r|\n');
 final _eofPadding = RegExp(r'[\x00\x1A]+$');
+// A ^Z ending a line is the end-of-file mark of a concatenated part.
+final _eofMarkerAtLineEnd = RegExp('\x1A+(?=\r\n|\r|\n)');
 
-NormalizeResult normalizeText(String text, {required TextEncoding encoding}) {
+NormalizeResult normalizeText(String text) {
   // DOS and XMODEM pad files out with ^Z (and sometimes NUL); `type` stopped
-  // at the first ^Z, so trailing padding is not content.
+  // at the first ^Z, so trailing padding and line-ending ^Z marks are not
+  // content.
   final padding = _eofPadding.firstMatch(text);
-  final eofPadding = padding == null ? 0 : padding.end - padding.start;
+  var eofPadding = padding == null ? 0 : padding.end - padding.start;
   if (padding != null) text = text.substring(0, padding.start);
+  text = text.replaceAllMapped(_eofMarkerAtLineEnd, (m) {
+    eofPadding += m.end - m.start;
+    return '';
+  });
 
   var ansiSequences = 0;
   text = text.replaceAllMapped(_ansi, (_) {
@@ -49,6 +58,7 @@ NormalizeResult normalizeText(String text, {required TextEncoding encoding}) {
   final inventory = <int>{};
   var formFeeds = 0;
   var placeholders = 0;
+  var controlGlyphs = 0;
   var longest = 0;
 
   void emit(String line, int columns) {
@@ -76,8 +86,12 @@ NormalizeResult normalizeText(String text, {required TextEncoding encoding}) {
         emit('', 0);
         continue;
       }
-      final shown = _display(rune, encoding);
-      if (shown != rune && shown == _placeholderRune) placeholders++;
+      final shown = _display(rune);
+      if (shown == _placeholderRune && shown != rune) {
+        placeholders++;
+      } else if (shown != rune) {
+        controlGlyphs++;
+      }
       out.writeCharCode(shown);
       inventory.add(shown);
       column++;
@@ -95,6 +109,7 @@ NormalizeResult normalizeText(String text, {required TextEncoding encoding}) {
       ansiSequences: ansiSequences,
       formFeeds: formFeeds,
       placeholders: placeholders,
+      controlGlyphs: controlGlyphs,
       eofPadding: eofPadding,
     ),
   );
@@ -104,16 +119,16 @@ final int _placeholderRune = controlPlaceholder.runes.single;
 final List<int> _cp437LowRunes = cp437Low.runes.toList();
 final int _cp437DelRune = cp437Del.runes.single;
 
-/// The code point to show for [rune]. In CP437 files C0 bytes are glyphs
-/// (☺♥…), as DOS displayed them; elsewhere they are controls.
-int _display(int rune, TextEncoding encoding) {
-  final isC0 = rune < 0x20;
-  final isDel = rune == 0x7F;
-  final isC1 = rune >= 0x80 && rune < 0xA0;
-  if (!isC0 && !isDel && !isC1) return rune;
-  if (encoding == TextEncoding.cp437) {
-    if (isC0) return _cp437LowRunes[rune];
-    if (isDel) return _cp437DelRune;
-  }
-  return _placeholderRune;
+/// The code point to show for [rune].
+///
+/// C0 bytes and DEL show as their CP437 glyphs (☺♥←…), as DOS displayed
+/// them, in every encoding: the archive's UTF-8 conversion kept them as
+/// raw bytes, and they are often art (see docs/decisions.md). NUL, which
+/// CP437 shows as blank, and C1 controls, which have no CP437 meaning once
+/// decoded, become the placeholder.
+int _display(int rune) {
+  if (rune < 0x20) return _cp437LowRunes[rune];
+  if (rune == 0x7F) return _cp437DelRune;
+  if (rune >= 0x80 && rune < 0xA0) return _placeholderRune;
+  return rune;
 }
