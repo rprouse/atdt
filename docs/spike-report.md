@@ -134,6 +134,15 @@ viewport.
 
 ## Notes for later stages
 
+- **Advance rounding differs by text backend.** In CI (Linux, FreeType),
+  80 glyphs at about 7.8 pt end up to 0.7 px short of `80 x fontSize x
+  advanceRatio`; on Windows they are exact. Columns stay aligned, because
+  every line uses the same per-glyph advance; only the block's right
+  margin changes by under a seventh of a glyph. Check on Android and iOS
+  devices whether the 80-column block ever *overshoots* the available
+  width. If it does, the calculator should measure the advance at the
+  computed font size, not only at the reference size.
+
 - With the chrome showing, the top lines of a phile sit under it, because
   chrome is an overlay. That's per spec, but opening a phile with the
   chrome hidden, or starting with a top margin, may read better. Revisit in

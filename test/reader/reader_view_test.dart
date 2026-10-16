@@ -31,10 +31,16 @@ void main() {
           expect(line, hasLength(80));
           final extent = glyphExtent(tester, line);
           expect(extent.left, closeTo(readerHorizontalPadding, 0.01));
-          expect(
-            extent.right,
-            closeTo(size.width - readerHorizontalPadding, 0.05),
-          );
+
+          // Text backends may round small-size advances (FreeType on Linux
+          // lands up to ~0.7 px short over 80 glyphs; Windows is exact). The
+          // spec's requirement is that all 80 columns are visible and there
+          // is no room for an 81st, so assert that, not sub-pixel equality.
+          final advance = (extent.right - extent.left) / 80;
+          final textRight = size.width - readerHorizontalPadding;
+          expect(extent.right, lessThanOrEqualTo(textRight + 0.01));
+          expect(textRight - extent.right, lessThan(advance / 4));
+          expect(extent.right, lessThanOrEqualTo(size.width));
         });
       }
     }
