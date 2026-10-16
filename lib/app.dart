@@ -1,34 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Root widget. Stage A replaces [_PlaceholderScreen] with the reader.
-class AtdtApp extends StatelessWidget {
+import 'reader/reader_screen.dart';
+import 'reader/reader_settings.dart';
+
+class AtdtApp extends ConsumerWidget {
   const AtdtApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = ref.watch(readerSettingsProvider.select((s) => s.theme));
     return MaterialApp(
       title: 'ATDT',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF33FF33),
-          brightness: Brightness.dark,
-        ),
-      ),
-      home: const _PlaceholderScreen(),
-    );
-  }
-}
-
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text('ATDT', style: TextStyle(fontFamily: 'monospace')),
-      ),
+      theme: theme.toThemeData(),
+      home: const ReaderScreen(),
     );
   }
 }
