@@ -14,6 +14,7 @@ test/fixtures/** -text -eol -diff binary
 *.png binary
 *.jpg binary
 *.ttf binary
+*.TTF binary
 *.otf binary
 *.woff binary
 *.woff2 binary

@@ -18,58 +18,31 @@ void main() {
     for (final size in [_portrait, _landscape]) {
       final orientation = size == _portrait ? 'portrait' : 'landscape';
 
-      testWidgets('vector font fills the width in $orientation', (
-        tester,
-      ) async {
-        setSurface(tester, size);
-        addTearDown(tester.view.reset);
-        final text = fixture('exact_80.txt');
-        await tester.pumpWidget(readerApp(text: text, font: jetBrainsMono));
+      for (final font in readerFonts) {
+        testWidgets('${font.id} fills the width in $orientation', (
+          tester,
+        ) async {
+          setSurface(tester, size);
+          addTearDown(tester.view.reset);
+          final text = fixture('exact_80.txt');
+          await tester.pumpWidget(readerApp(text: text, font: font));
 
-        final line = text.lines[1];
-        expect(line, hasLength(80));
-        final extent = glyphExtent(tester, line);
-        expect(extent.left, closeTo(readerHorizontalPadding, 0.01));
-        expect(
-          extent.right,
-          closeTo(size.width - readerHorizontalPadding, 0.05),
-        );
-      });
-
-      testWidgets('pixel font shows 80 columns at integer scale in '
-          '$orientation', (tester) async {
-        setSurface(tester, size);
-        addTearDown(tester.view.reset);
-        final key = GlobalKey<ReaderViewState>();
-        final text = fixture('exact_80.txt');
-        await tester.pumpWidget(
-          readerApp(text: text, font: pxPlusVga, key: key),
-        );
-
-        final layout = key.currentState!.layout!;
-        expect(layout.integerScale, isNotNull);
-        expect(layout.usedFallback, isFalse);
-
-        final extent = glyphExtent(tester, text.lines[1]);
-        final physicalWidth = (extent.right - extent.left) * 3;
-        // 80 glyphs of 8 font pixels each, at a whole-number scale.
-        expect(physicalWidth, closeTo(80 * 8 * layout.integerScale!, 0.01));
-        // Block starts on a device pixel and fits inside the padding.
-        expect(
-          extent.left * 3,
-          closeTo((extent.left * 3).roundToDouble(), 1e-6),
-        );
-        expect(extent.left, greaterThanOrEqualTo(readerHorizontalPadding));
-        expect(
-          extent.right,
-          lessThanOrEqualTo(size.width - readerHorizontalPadding + 1e-6),
-        );
-      });
+          final line = text.lines[1];
+          expect(line, hasLength(80));
+          final extent = glyphExtent(tester, line);
+          expect(extent.left, closeTo(readerHorizontalPadding, 0.01));
+          expect(
+            extent.right,
+            closeTo(size.width - readerHorizontalPadding, 0.05),
+          );
+        });
+      }
     }
 
     testWidgets('measured advance ratios match the font files', (tester) async {
       expect(measureAdvanceRatio(jetBrainsMono), closeTo(0.6, 1e-4));
-      expect(measureAdvanceRatio(pxPlusVga), closeTo(0.5, 1e-4));
+      expect(measureAdvanceRatio(bigBlueTerminal), closeTo(2 / 3, 1e-4));
+      expect(measureAdvanceRatio(c64ProMono), closeTo(1, 1e-4));
     });
   });
 
@@ -146,7 +119,7 @@ void main() {
       state.horizontalController!.jumpTo(columns * layout.glyphAdvance);
     }
 
-    for (final font in [jetBrainsMono, pxPlusVga]) {
+    for (final font in readerFonts) {
       testWidgets('rotation keeps top line and column (${font.id})', (
         tester,
       ) async {
@@ -190,14 +163,14 @@ void main() {
       await tester.pumpWidget(
         readerApp(
           text: tester.widget<ReaderView>(find.byType(ReaderView)).text,
-          font: pxPlusVga,
+          font: bigBlueTerminal,
           key: key,
         ),
       );
       await tester.pump();
 
       expect(key.currentState!.position.topLineIndex, 7000);
-      expect(key.currentState!.layout!.integerScale, isNotNull);
+      expect(key.currentState!.widget.font, bigBlueTerminal);
     });
   });
 

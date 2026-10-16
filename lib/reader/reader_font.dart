@@ -10,13 +10,34 @@ const List<FontFeature> readerFontFeatures = [
   FontFeature.disable('calt'),
 ];
 
+/// Licence and credit for a bundled font, shown in the About dialog.
+class FontCredit {
+  const FontCredit({
+    required this.licenceName,
+    required this.licenceAsset,
+    required this.attribution,
+  });
+
+  final String licenceName;
+
+  /// Asset path of the licence text shipped with the font.
+  final String licenceAsset;
+  final String attribution;
+}
+
 /// A bundled reader font. Stage E replaces this list with a manifest.
+///
+/// [integerScale] fonts render at whole multiples of their native cell
+/// (see the layout calculator). No bundled font uses it at the moment: the
+/// retro fonts are drawn as outlines at fit size so they fill the width in
+/// portrait, where an 8-pixel cell only reaches 1x on phones.
 class ReaderFont {
   const ReaderFont({
     required this.id,
     required this.displayName,
     required this.family,
     required this.lineHeightRatio,
+    required this.credit,
     this.integerScale = false,
     this.cellWidthPx,
     this.nativeSizePx,
@@ -26,6 +47,7 @@ class ReaderFont {
   final String displayName;
   final String family;
   final double lineHeightRatio;
+  final FontCredit credit;
   final bool integerScale;
   final int? cellWidthPx;
   final int? nativeSizePx;
@@ -39,22 +61,47 @@ class ReaderFont {
   );
 }
 
+// Line height ratios are each font's own ascent + descent, so box-drawing
+// verticals join from one line to the next.
 const readerFonts = [
-  // 1.32 is the font's own ascent + descent, so box-drawing verticals join.
   ReaderFont(
     id: 'jetbrains_mono',
     displayName: 'JetBrains Mono',
     family: 'JetBrainsMono',
     lineHeightRatio: 1.32,
+    credit: FontCredit(
+      licenceName: 'SIL Open Font License 1.1',
+      licenceAsset: 'assets/fonts/jetbrains_mono/OFL.txt',
+      attribution:
+          'JetBrains Mono 2.304, copyright 2020 The JetBrains Mono Project '
+          'Authors (github.com/JetBrains/JetBrainsMono).',
+    ),
   ),
   ReaderFont(
-    id: 'pxplus_ibm_vga_8x16',
-    displayName: 'IBM VGA 8x16',
-    family: 'PxPlusIbmVga8x16',
+    id: 'bigblue_terminal_plus',
+    displayName: 'BigBlue Terminal',
+    family: 'BigBlueTerminalPlus',
     lineHeightRatio: 1,
-    integerScale: true,
-    cellWidthPx: 8,
-    nativeSizePx: 16,
+    credit: FontCredit(
+      licenceName: 'CC BY-SA 4.0',
+      licenceAsset: 'assets/fonts/bigblue_terminal/LICENSE.TXT',
+      attribution:
+          'BigBlue TerminalPlus 1.0 by VileR (int10h.org), based on the '
+          'IBM 8x14 EGA/VGA charset.',
+    ),
+  ),
+  ReaderFont(
+    id: 'c64_pro_mono',
+    displayName: 'C64 Pro Mono',
+    family: 'C64ProMono',
+    lineHeightRatio: 1,
+    credit: FontCredit(
+      licenceName: 'Style C64 TrueType licence',
+      licenceAsset: 'assets/fonts/c64_pro_mono/license.txt',
+      attribution:
+          'C64 Pro Mono 1.2.1, (c) 2010-2019 Style '
+          '(style64.org/c64-truetype).',
+    ),
   ),
 ];
 

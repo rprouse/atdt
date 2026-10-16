@@ -9,8 +9,12 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-final jetBrainsMono = readerFontById('jetbrains_mono');
-final pxPlusVga = readerFontById('pxplus_ibm_vga_8x16');
+// Strict lookups: readerFontById falls back silently, which would hide a
+// renamed font in tests.
+ReaderFont _font(String id) => readerFonts.singleWhere((f) => f.id == id);
+final jetBrainsMono = _font('jetbrains_mono');
+final bigBlueTerminal = _font('bigblue_terminal_plus');
+final c64ProMono = _font('c64_pro_mono');
 
 /// Goldens are rendered and compared on Linux only (CI, or the Docker
 /// script in tool/goldens/), because text rasterisation differs by OS.
@@ -21,8 +25,9 @@ const goldenSkipReason = 'Goldens run on Linux only: see tool/goldens/';
 Future<void> loadReaderFonts() async {
   const files = {
     'JetBrainsMono': 'assets/fonts/jetbrains_mono/JetBrainsMono-Regular.ttf',
-    'PxPlusIbmVga8x16':
-        'assets/fonts/pxplus_ibm_vga_8x16/PxPlus_IBM_VGA_8x16.ttf',
+    'BigBlueTerminalPlus':
+        'assets/fonts/bigblue_terminal/BigBlue_TerminalPlus.TTF',
+    'C64ProMono': 'assets/fonts/c64_pro_mono/C64_Pro_Mono-STYLE.ttf',
   };
   for (final MapEntry(key: family, value: path) in files.entries) {
     final bytes = File(path).readAsBytesSync();

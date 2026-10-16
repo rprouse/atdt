@@ -27,7 +27,7 @@ void main() {
     );
   }
 
-  for (final font in [jetBrainsMono, pxPlusVga]) {
+  for (final font in readerFonts) {
     for (final MapEntry(key: orientation, value: size) in _sizes.entries) {
       testWidgets(
         '80 columns at fit: ${font.id} $orientation',

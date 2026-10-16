@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'about.dart';
 import 'debug_overlay.dart';
 import 'reader_font.dart';
 import 'reader_settings.dart';
@@ -176,6 +177,11 @@ class _TopBar extends ConsumerWidget {
                       : Icons.bug_report_outlined,
                 ),
                 onPressed: notifier.toggleDebugOverlay,
+              ),
+              IconButton(
+                tooltip: 'About',
+                icon: const Icon(Icons.info_outline),
+                onPressed: () => showAtdtAbout(context),
               ),
             ],
           ),

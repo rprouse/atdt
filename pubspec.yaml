@@ -61,11 +61,19 @@ flutter:
     # when assets/dev/ has no philes. Remove once Stage D feeds the reader
     # from storage.
     - test/fixtures/
+    # Font licences, shown in the About dialog's licence page.
+    - assets/fonts/jetbrains_mono/OFL.txt
+    - assets/fonts/bigblue_terminal/LICENSE.TXT
+    - assets/fonts/c64_pro_mono/license.txt
 
   fonts:
     - family: JetBrainsMono
       fonts:
         - asset: assets/fonts/jetbrains_mono/JetBrainsMono-Regular.ttf
-    - family: PxPlusIbmVga8x16
+    - family: BigBlueTerminalPlus
       fonts:
-        - asset: assets/fonts/pxplus_ibm_vga_8x16/PxPlus_IBM_VGA_8x16.ttf
+        - asset: assets/fonts/bigblue_terminal/BigBlue_TerminalPlus.TTF
+    # Licence: must stay unmodified and keep its original file name.
+    - family: C64ProMono
+      fonts:
+        - asset: assets/fonts/c64_pro_mono/C64_Pro_Mono-STYLE.ttf

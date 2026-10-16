@@ -21,7 +21,7 @@ Each entry records:
 | B | CP437 vs Latin-1 heuristic against the real archive | Open |
 | B | YAML front matter added to archive `.txt` files | Found 2026-10-16; handle in Stage B |
 | C | Archive URL pattern, format, and metadata location | Partly verified 2026-10-16 (tarball contents beyond issue 1 still open) |
-| E | Licence of each candidate font | Open (two verified for Stage A) |
+| E | Licence of each candidate font | Open (JetBrains Mono, BigBlue TerminalPlus and C64 Pro Mono verified) |
 | G | Flutter selection behaviour in lazily built lists | Open |
 | I | Section header patterns across the archive | Open |
 
@@ -108,3 +108,17 @@ Each entry records:
   - Goldens are Linux-only and skip on other OSes.
   - CI pins Flutter 3.47.7. `tool/goldens/Dockerfile` builds the same version from a git tag, and `tool/goldens/update.ps1` regenerates (or `-Check`s) goldens from Windows.
   - The acceptance checks that must hold everywhere don't rely on goldens: 80-column widths measured from shaped glyph boxes, a pixel-equality ligature test with a `calt`-on control, and geometry checks for overflow and chrome.
+
+## 2026-10-16: Retro fonts as outlines, not integer-scaled pixels
+
+- **Checked:** PxPlus IBM VGA 8x16 with integer scaling, on the emulator and in the calculator for common phone widths. Also the licences and binaries of BigBlue TerminalPlus and C64 Pro Mono, from their primary sources.
+- **Found:**
+  - With integer scaling, an 8-pixel cell reaches only **1x on every phone in portrait**: 8 physical pixels per glyph, with 38–43% of the width unused. Review judged the pixel font "not great".
+  - **BigBlue TerminalPlus 1.0** (VileR, int10h.org) is CC BY-SA 4.0. Advance is 800/1200 = 0.667 and line height is 1.0 em. It has full CP437 and Latin-1 coverage and no GSUB features. The original `BigBlue_TerminalPlus.TTF` is better for us than the Nerd Font patch: the patch adds thousands of icon glyphs we don't need and is an adaptation.
+  - **C64 Pro Mono 1.2.1** (Style, style64.org) is under Style's own licence. It may be included in a software package **only unmodified, under its original file name, and only if the software is free to end users**. It may not be sold, put in a font collection, or offered for direct download. Advance is 1.0 (square cells) and line height is 1.0 em. Coverage is ASCII and PETSCII: 29/128 box-drawing characters, no double-line boxes, and most accented Latin-1 letters missing.
+- **Changed:**
+  - Dropped PxPlus IBM VGA 8x16. BigBlue TerminalPlus and C64 Pro Mono now render as outlines at fit size, like JetBrains Mono, so all three fill 80 columns in every orientation.
+  - `C64_Pro_Mono-STYLE.ttf` keeps its original file name. `.gitattributes` gains `*.TTF binary` for BigBlue's upper-case extension.
+  - Added an About dialog (chrome info button) with each font's credit. Each font's shipped licence file is registered with Flutter's `LicenseRegistry`, so "View licenses" shows the full texts. Tests check both.
+  - The integer-scale code path and its unit tests stay in the layout calculator. The spec keeps it as a core rule and Stage E's manifest has the flag; no bundled font sets it today.
+  - **Release constraint:** C64 Pro Mono can only ship while ATDT is free. Any paid tier needs a licence from Style, or the font must be removed from that build.

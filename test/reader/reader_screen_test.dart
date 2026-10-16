@@ -1,7 +1,10 @@
 import 'dart:ui' show DisplayFeature, DisplayFeatureState, DisplayFeatureType;
 
 import 'package:atdt/app.dart';
+import 'package:atdt/reader/about.dart';
+import 'package:atdt/reader/reader_font.dart';
 import 'package:atdt/reader/reader_settings.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -130,5 +133,43 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_textGeometry(tester).$1.dx, closeTo(before.$1.dx + 30, 0.01));
+  });
+
+  testWidgets('About lists a credit for every font', (tester) async {
+    await openApp(tester);
+
+    await tester.tap(find.byTooltip('About'));
+    await tester.pumpAndSettle();
+
+    for (final font in readerFonts) {
+      expect(find.byKey(ValueKey('credit-${font.id}')), findsOneWidget);
+    }
+    expect(find.textContaining('not affiliated with Phrack'), findsOneWidget);
+  });
+
+  testWidgets('font licences are registered with their shipped text', (
+    tester,
+  ) async {
+    LicenseRegistry.reset();
+    addTearDown(LicenseRegistry.reset);
+    registerFontLicences();
+
+    final entries = await tester.runAsync(
+      () => LicenseRegistry.licenses.toList(),
+    );
+    final byPackage = {
+      for (final e in entries!)
+        e.packages.single: e.paragraphs.map((p) => p.text).join(' '),
+    };
+
+    expect(byPackage['JetBrains Mono (font)'], contains('SIL Open Font'));
+    expect(
+      byPackage['BigBlue Terminal (font)'],
+      contains('Attribution-ShareAlike 4.0'),
+    );
+    expect(
+      byPackage['C64 Pro Mono (font)'],
+      contains('freely provided to end users'),
+    );
   });
 }

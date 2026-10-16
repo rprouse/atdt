@@ -49,7 +49,7 @@ flutter pub get
 flutter run
 ```
 
-The Stage A app is a single reader screen. Tap the text to show or hide the chrome. The chrome's menus switch the file, font (JetBrains Mono or IBM VGA 8x16), theme and orientation (Auto, Portrait, Landscape). The bug icon shows a debug overlay with the computed font size, integer scale, line height, top line, column offset, device pixel ratio and available width.
+The Stage A app is a single reader screen. Tap the text to show or hide the chrome. The chrome's menus switch the file, font (JetBrains Mono, BigBlue Terminal or C64 Pro Mono), theme and orientation (Auto, Portrait, Landscape). The bug icon shows a debug overlay with the computed font size, line height, top line, column offset, device pixel ratio and available width. The info icon opens the About dialog with font credits and licences.
 
 ### Real philes for manual testing
 
@@ -130,6 +130,6 @@ docs/          Spec, decisions log, spike report
 
 The source code is released under the [MIT License](LICENSE).
 
-Bundled fonts keep their own licences (for example SIL OFL 1.1 and CC BY-SA 4.0). They are listed with attribution on the in-app credits screen and alongside each font in `assets/fonts/`.
+Bundled fonts keep their own licences: JetBrains Mono (SIL OFL 1.1), BigBlue TerminalPlus by VileR (CC BY-SA 4.0) and C64 Pro Mono by Style (freeware, only for software that is free to end users). They are credited in the app's About dialog and alongside each font in `assets/fonts/`.
 
 Phrack and all Phrack content belong to their respective authors and the Phrack staff. This project is not affiliated with Phrack.
