@@ -1,0 +1,12 @@
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          # SQLite bundled by package:sqlite3 v3 build hooks has FTS5
+          # (docs/decisions.md); let drift_dev accept fts5 tables for Stage H.
+          sql:
+            dialect: sqlite
+            options:
+              version: "3.45"
+              modules: [fts5]
