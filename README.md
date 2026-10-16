@@ -36,7 +36,8 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 
 ## Requirements
 
-- [Flutter](https://docs.flutter.dev/get-started/install) (stable channel), which includes Dart
+- [Flutter](https://docs.flutter.dev/get-started/install) 3.47 or newer (stable channel), which includes Dart 3.13
+- JDK 17, available to `flutter doctor`, for Android builds
 - Android Studio or the Android SDK, for Android builds
 - Xcode on macOS, for iOS builds
 
@@ -77,9 +78,11 @@ flutter run --profile
 lib/
   layout/      Pure Dart layout maths (no Flutter imports)
   ingest/      Pure Dart decoding and normalisation (no Flutter imports)
+  archive/     Pure Dart archive parsing (no Flutter imports)
   reader/      The reader widget and its scroll structure
 test/
   fixtures/    Synthetic, byte-exact text fixtures
+  architecture_test.dart   Fails if a pure-Dart folder imports Flutter
 integration_test/
 tool/          Developer scripts
 docs/          Spec, decisions log, spike report
