@@ -1,0 +1,21 @@
+# Normalise source files to LF in the repository.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Test fixtures are byte-exact inputs to the ingestion tests (CRLF, lone CR,
+# CP437 high bytes, form feeds, ANSI escapes). Git must never touch them.
+test/fixtures/** -text -eol -diff binary
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.gz binary
+*.tar binary
