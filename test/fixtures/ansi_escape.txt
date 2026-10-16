@@ -1,0 +1,2 @@
+[1;32mgreen bold[0m plain
+[2Jcleared

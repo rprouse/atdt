@@ -1,7 +1,8 @@
 # --- Project-specific -------------------------------------------------------
 
 # Real Phrack philes for manual testing. Never commit Phrack text.
-assets/dev/
+assets/dev/*
+!assets/dev/README.md
 
 # Output of developer batch tools (e.g. ingestion CSV runs over the archive).
 tool/out/

@@ -1,0 +1,14 @@
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{
+	int i;
+	for (i = 0; i < argc; i++) {
+		if (argv[i] != NULL)
+			printf("%d\t%s\n", i, argv[i]);
+	}
+x	tab stop at 8
+xxxxxxx	stop at 8
+xxxxxxxx	stop at 16
+	return 0;
+}
