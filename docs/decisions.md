@@ -12,7 +12,7 @@ Each entry records:
 
 | Stage | Item | Status |
 |---|---|---|
-| — | FTS5 included in the bundled SQLite build, and whether `sqlite3_flutter_libs` or `sqlite3` v3 build hooks is the right way to bundle it | Open (Stage C) |
+| — | FTS5 included in the bundled SQLite build, and whether `sqlite3_flutter_libs` or `sqlite3` v3 build hooks is the right way to bundle it | Verified 2026-10-16 (build hooks; FTS5 present; pinned by a test) |
 | — | Golden test platform | Decided 2026-10-16 |
 | A | Licence of the vector monospace font (SIL OFL, ships ligatures) | Verified 2026-10-16 |
 | A | Licence of VileR's Ultimate Oldschool PC Font Pack | Verified 2026-10-16 |
@@ -20,7 +20,7 @@ Each entry records:
 | A | Horizontal insets that stay put when system bars hide | Decided 2026-10-16; check on device |
 | B | CP437 vs Latin-1 heuristic against the real archive | Verified 2026-10-16 (archive is all UTF-8; heuristic kept as fallback) |
 | B | YAML front matter added to archive `.txt` files | Handled 2026-10-16 |
-| C | Archive URL pattern, format, and metadata location | Partly verified 2026-10-16 (tarball contents beyond issue 1 still open) |
+| C | Archive URL pattern, format, and metadata location | Verified 2026-10-16 (all 72 tarballs; dates from the issue picker) |
 | E | Licence of each candidate font | Open (JetBrains Mono, BigBlue TerminalPlus and C64 Pro Mono verified) |
 | G | Flutter selection behaviour in lazily built lists | Open |
 | I | Section header patterns across the archive | Open |
@@ -144,3 +144,51 @@ ferent`).
   - A ^Z immediately before a line break is dropped (DOS stopped reading there), as well as trailing ^Z/NUL padding.
   - The decoding heuristic (CP437 when box-drawing bytes appear outside words; Latin-1 when accented letters sit inside them; Windows-1252 when bytes 0x80–0x9F are prose punctuation) stays as the fallback for non-UTF-8 sources. It is covered by fixtures. Ambiguous decisions are flagged on `PhileText.encodingAmbiguous` and in the CSV; none occur in the archive.
   - **For Stage C:** import must run off the UI isolate (71/7 alone takes seconds on a phone). Line-offset storage must cope with philes over 16 MB.
+
+## 2026-10-16: SQLite bundling and FTS5
+
+- **Checked:** pub.dev, the changelogs and READMEs of `drift`, `drift_flutter`, `sqlite3` and `sqlite3_flutter_libs`, and the drift docs. Ran FTS5 under `flutter test` on Windows and in the Linux CI container.
+- **Found:**
+  - `sqlite3` 3.x bundles SQLite (3.54 in 3.7.x) through Dart build hooks on Android, iOS, Windows and Linux. The prebuilt binaries are compiled with `SQLITE_ENABLE_FTS5`, and iOS uses the bundled copy, not the system SQLite.
+  - **`sqlite3_flutter_libs` is end-of-life** (0.6.0+eol does nothing). Its README says to remove it after moving to `sqlite3` 3.x. `drift_flutter` 0.3.x pulls in the empty eol stub on purpose.
+  - The `sqlite3` Dart API has no incremental blob I/O (`sqlite3_blob_open`).
+  - The hook downloads the SQLite binary (sha256-checked), so CI needs network access, which GitHub Actions has.
+- **Changed:**
+  - Using `drift` 2.35 + `drift_flutter` 0.3 + `path_provider`; `sqlite3_flutter_libs` is not a direct dependency, unlike the spec.
+  - `build.yaml` tells `drift_dev` about the fts5 module, ready for Stage H.
+  - `test/storage/archive_database_test.dart` creates an FTS5 table and runs a `MATCH` query, so losing FTS5 fails CI.
+
+## 2026-10-16: Archive format and metadata (Stage C)
+
+- **Checked:** all 72 cached tarballs with Python's `tarfile`; phrack.org issue pages; `archives.phrack.org/robots.txt`.
+- **Found:**
+  - Every tarball has the same flat layout: a `./` entry plus `./N.txt` files only. There are no PDFs, nested paths, symlinks or unsafe paths. The archive is 31.1 MB compressed and 61 MB once stored.
+  - Tar timestamps are all 1985-11-17 00:00 (normalised), so they are **not release dates**.
+  - Release dates for all 72 issues are in the issue-jump `<select>` on every issue page (`Issue N (YYYY-MM-DD)`). `/issues/1/1` is a meta-refresh stub to the slugged page, so two requests fetch every date.
+  - `archives.phrack.org/robots.txt` only *defines* Cloudflare content signals (search, ai-input, ai-train) and sets none, so under its own clause (c) it neither grants nor restricts. An offline reader on the user's device is none of those uses anyway.
+- **Changed:**
+  - Issues are discovered from the `tgz/` directory index, so "check for new issues" finds issue 73 when it appears.
+  - Release dates are fetched best effort; a failure leaves them null ("if known").
+  - Title and author come from front matter, falling back to "Phile N" and no author. Nothing is guessed.
+
+## 2026-10-16: Text storage in line-aligned chunks
+
+- **Checked:** how to read one line without loading a 16 MB phile, given no incremental blob I/O. Measured on the emulator.
+- **Found:**
+  - SQLite's `substr()` on a BLOB materialises the whole value, so the spec's "single blob with line-start offsets" would read 16 MB per line for 71/7. The offsets alone would be 1 MB.
+  - With line-aligned chunks, `readLine` (debug build, x86 emulator, after warm-up) has p50 2.4–3.9 ms and p95 4.1–7.7 ms. **The median equals the empty-query round trip to drift's database isolate** (2.5–3.1 ms), so the lookup itself is negligible. Chunk size barely matters: 64 KiB gave p95 4.55 ms, 16 KiB 4.22 ms, and 4 KiB 3.78 ms in one run.
+- **Changed:**
+  - The `phile_text` table holds ~16 KiB chunks of whole lines, each tagged with `first_line` and `line_count` and indexed by `(phile_id, first_line)`. Any line is one indexed lookup of one chunk. That meets the spec's purpose ("read a line without splitting the whole file"), but not its literal design.
+  - `readLine` uses a raw prepared query; the query builder cost more than the lookup in debug.
+  - `integration_test/storage_perf_test.dart` asserts p95 < 5 ms only in profile and release builds. **Pending:** run it on a mid-range physical phone in profile mode.
+
+## 2026-10-16: Download robustness and backup exclusion
+
+- **Checked:** a fresh emulator install downloading the real archive, killed mid-download, then airplane mode mid-download.
+- **Found and fixed during testing:**
+  - Dart's gzip decoder accepts a truncated stream silently, which would have stored a half-downloaded issue as empty. There are now three guards: the gzip ISIZE trailer, the tar end-of-archive marker, and rejection of an issue with no philes.
+  - On device, a kill after 9 issues relaunched straight into a resumed run of the 63 remaining issues, without a tap. Airplane mode showed "Can't reach the Phrack archive…" with Retry, keeping the 25 issues done; Retry stored the other 47. Final state: 72 issues, 1,026 philes, all release dates, SQLite integrity ok.
+- **Changed:**
+  - Each issue is saved in one transaction. A persisted `archive.download` flag ("requested" or "settled") drives the auto-resume at launch.
+  - The database is `<application support>/atdt/archive.sqlite`. Android excludes `files/atdt/` with `fullBackupContent` (API ≤ 30) and `dataExtractionRules` (API 31+, cloud backup and device transfer). iOS sets `isExcludedFromBackup` on the folder through a method channel in `AppDelegate`. **Not yet built or verified on iOS: needs a Mac.**
+  - Reading positions share the database, so they are excluded from backup too. They are per-device state, and the archive can be fetched again; a separate backed-up store can be added in Stage G if wanted.

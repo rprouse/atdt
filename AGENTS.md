@@ -10,7 +10,7 @@ ATDT is a Flutter (Dart) app for iOS and Android that reads the Phrack archive a
 
 1. **Never commit Phrack text.** Real philes live only in the git-ignored `assets/dev/`. Tests use synthetic fixtures in `test/fixtures/` that you write yourself.
 2. **Never reflow or rewrap text.** Every line renders on exactly one visual row. `softWrap: false`, `maxLines: 1`, `overflow: TextOverflow.visible`.
-3. **Pure Dart cores.** Layout maths (`lib/layout/`), ingestion (`lib/ingest/`) and archive parsing must not import `package:flutter`. Keep them unit-testable with plain `dart test` semantics.
+3. **Pure Dart cores.** Layout maths (`lib/layout/`), ingestion (`lib/ingest/`) and archive parsing and downloading (`lib/archive/`) must not import `package:flutter`. Keep them unit-testable with plain `dart test` semantics. Storage (`lib/storage/`) is pure drift except `database_file.dart`, which opens the file on a device.
 4. **Position is a tuple, never pixels.** Reading position is `(topLineIndex, fractionIntoLine, columnOffset)`. Restore from it after every metrics change.
 5. **Chrome is an overlay.** Showing or hiding chrome must never move a line of text.
 6. **Ligatures off on every font:** `FontFeature.disable('liga')` and `FontFeature.disable('calt')`.
@@ -37,7 +37,7 @@ dart format .
 flutter test
 flutter test --update-goldens
 flutter test integration_test
-dart run build_runner build --delete-conflicting-outputs   # drift codegen (Stage C onward)
+dart run build_runner build --delete-conflicting-outputs   # drift codegen; *.g.dart is committed
 ```
 
 Before calling any work done, run `dart format --set-exit-if-changed .`, `flutter analyze` and `flutter test`. All three must be clean.
