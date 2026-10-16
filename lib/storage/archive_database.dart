@@ -84,6 +84,18 @@ class ReadingStates extends Table {
   Set<Column> get primaryKey => {phileId};
 }
 
+/// Small app state that must survive restarts (e.g. an unfinished download).
+class AppSettings extends Table {
+  @override
+  String get tableName => 'settings';
+
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
 class ArchiveCounts {
   const ArchiveCounts({required this.issues, required this.philes});
 
@@ -107,7 +119,9 @@ abstract interface class ArchiveStore {
   Future<ArchiveCounts> counts();
 }
 
-@DriftDatabase(tables: [Issues, Philes, PhileTextChunks, ReadingStates])
+@DriftDatabase(
+  tables: [Issues, Philes, PhileTextChunks, ReadingStates, AppSettings],
+)
 class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
   ArchiveDatabase(super.executor, {this.chunkBytes = defaultChunkBytes});
 
@@ -191,6 +205,14 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
       philes: p.read(phileCount)!,
     );
   }
+
+  Future<String?> setting(String key) async => (await (select(
+    appSettings,
+  )..where((s) => s.key.equals(key))).getSingleOrNull())?.value;
+
+  Future<void> setSetting(String key, String value) => into(
+    appSettings,
+  ).insertOnConflictUpdate(AppSettingsCompanion.insert(key: key, value: value));
 
   Future<Phile?> phile(int issue, int number) =>
       (select(philes)

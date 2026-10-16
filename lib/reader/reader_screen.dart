@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../download/download_screen.dart';
 import 'about.dart';
 import 'debug_overlay.dart';
 import 'reader_font.dart';
@@ -177,6 +178,15 @@ class _TopBar extends ConsumerWidget {
                       : Icons.bug_report_outlined,
                 ),
                 onPressed: notifier.toggleDebugOverlay,
+              ),
+              IconButton(
+                tooltip: 'Archive',
+                icon: const Icon(Icons.cloud_download_outlined),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DownloadScreen(),
+                  ),
+                ),
               ),
               IconButton(
                 tooltip: 'About',

@@ -129,6 +129,14 @@ void main() {
     });
   });
 
+  test('settings round-trip and overwrite', () async {
+    db = _memoryDb();
+    expect(await db.setting('k'), isNull);
+    await db.setSetting('k', 'one');
+    await db.setSetting('k', 'two');
+    expect(await db.setting('k'), 'two');
+  });
+
   test('the bundled SQLite supports FTS5 (Stage H search)', () async {
     db = _memoryDb();
     await db.customStatement('CREATE VIRTUAL TABLE t USING fts5(body)');
