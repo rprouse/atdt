@@ -1,7 +1,7 @@
 // Rotation and font changes on a real device, with real engine fonts.
 //
 //   flutter test integration_test/reader_rotation_test.dart -d <device>
-import 'package:atdt/ingest/spike_text.dart';
+import 'package:atdt/ingest/phile_text.dart';
 import 'package:atdt/reader/reader_font.dart';
 import 'package:atdt/reader/reader_view.dart';
 import 'package:flutter/material.dart';

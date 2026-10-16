@@ -1,0 +1,4 @@
+---
+This is a rule, not YAML
+---
+Body text
