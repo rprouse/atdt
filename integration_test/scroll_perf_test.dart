@@ -5,7 +5,7 @@
 //     --target=integration_test/scroll_perf_test.dart -d <device>
 //
 // Writes build/scroll_perf_<font>.timeline_summary.json for each font.
-import 'package:atdt/ingest/spike_text.dart';
+import 'package:atdt/ingest/phile_text.dart';
 import 'package:atdt/reader/reader_font.dart';
 import 'package:atdt/reader/reader_view.dart';
 import 'package:flutter/material.dart';

@@ -23,7 +23,7 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 | Stage | Name | Status |
 |---|---|---|
 | A | Rendering spike | In review: automated checks pass; device checks pending ([report](docs/spike-report.md)) |
-| B | Ingestion and normalisation | Not started |
+| B | Ingestion and normalisation | In review: all 1,026 archive philes ingest cleanly |
 | C | Archive download and storage | Not started |
 | D | Library navigation | Not started |
 | E | Font system | Not started |
@@ -67,6 +67,16 @@ If `assets/dev/` has no philes, the app opens the 10,000-line synthetic fixture.
 flutter test                         # unit and widget tests (goldens skip on Windows/macOS)
 dart run tool/gen_fixtures.dart      # regenerate the synthetic fixtures (deterministic)
 ```
+
+### Ingestion over the real archive
+
+A developer tool (not a test) runs ingestion over every Phrack issue and writes a CSV of encoding, line count, longest line and control-character counts per phile:
+
+```sh
+dart run tool/ingest_archive.dart          # all issues; or: ... 1 10
+```
+
+Issue tarballs are downloaded once (1 s apart) into the git-ignored `tool/out/archive/`; the report is `tool/out/ingest_report.csv`.
 
 ### Golden images
 

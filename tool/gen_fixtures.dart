@@ -92,6 +92,46 @@ void main() {
 
   write('empty.txt', const []);
 
+  // Windows-1252 curly quotes and an en dash: invalid UTF-8, and C1
+  // controls if read as Latin-1.
+  write('cp1252_quotes.txt', [
+    ...ascii.encode('He said '), 0x93, ...ascii.encode('don'), 0x92, //
+    ...ascii.encode('t'), 0x94, ...ascii.encode(' '), 0x96,
+    ...ascii.encode(' twice.\n'),
+  ]);
+
+  // CP437 file whose 0x03 byte is a heart glyph, not a control.
+  write('cp437_glyphs.txt', [
+    0xC9, 0xCD, 0xCD, 0xBB, ...ascii.encode(' I '), 0x03, //
+    ...ascii.encode(' DOS\n'),
+    0xC8, 0xCD, 0xCD, 0xBC, 0x0A,
+  ]);
+
+  // XMODEM/CP-M style ^Z padding after the last line.
+  write('eof_padding.txt', [
+    ...ascii.encode('last line\n'),
+    ...List.filled(20, 0x1A),
+  ]);
+
+  // Stray C0 controls and DEL in an otherwise ASCII file.
+  write(
+    'c0_controls.txt',
+    ascii.encode('bell\x07 back\x08space nul\x00 del\x7F end\n'),
+  );
+
+  // Front matter as the archive adds it: UTF-8 YAML over a CP437 body.
+  write('front_matter_cp437.txt', [
+    ...utf8.encode('---\ntitle: Café Box Art\nauthor: "The Mentor"\n---\n'),
+    0xC9, 0xCD, 0xCD, 0xBB, 0x0A, //
+    0xC8, 0xCD, 0xCD, 0xBC, 0x0A,
+  ]);
+
+  // Dashed rules that are not front matter must be kept.
+  write(
+    'not_front_matter.txt',
+    utf8.encode('---\nThis is a rule, not YAML\n---\nBody text\n'),
+  );
+
   write(
     'ligatures.txt',
     lf([

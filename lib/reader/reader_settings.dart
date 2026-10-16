@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../ingest/spike_text.dart';
+import '../ingest/phile_text.dart';
 import 'reader_font.dart';
 import 'reader_theme.dart';
 
