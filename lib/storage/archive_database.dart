@@ -45,7 +45,7 @@ class Philes extends Table {
   ];
 }
 
-/// Phile text in line-aligned chunks of about 64 KiB.
+/// Phile text in line-aligned chunks of about 16 KiB.
 ///
 /// SQLite reads a whole BLOB to take a substring, and package:sqlite3 has
 /// no incremental blob I/O, so one blob per phile would mean reading 16 MB
@@ -125,7 +125,7 @@ abstract interface class ArchiveStore {
 class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
   ArchiveDatabase(super.executor, {this.chunkBytes = defaultChunkBytes});
 
-  static const int defaultChunkBytes = 64 * 1024;
+  static const int defaultChunkBytes = 16 * 1024;
 
   /// Target size of a text chunk; small values let tests force many chunks.
   final int chunkBytes;
@@ -220,21 +220,22 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
           .getSingleOrNull();
 
   /// One line of a phile, read from a single chunk.
+  ///
+  /// Raw SQL on the (phile_id, first_line) index: this is the hot path the
+  /// 5 ms target applies to, and the query builder costs more than the
+  /// lookup itself.
   Future<String?> readLine(int phileId, int line) async {
-    final chunk =
-        await (select(phileTextChunks)
-              ..where(
-                (c) =>
-                    c.phileId.equals(phileId) &
-                    c.firstLine.isSmallerOrEqualValue(line),
-              )
-              ..orderBy([(c) => OrderingTerm.desc(c.firstLine)])
-              ..limit(1))
-            .getSingleOrNull();
-    if (chunk == null || line >= chunk.firstLine + chunk.lineCount) {
-      return null;
-    }
-    return _lineInChunk(chunk.data, line - chunk.firstLine);
+    final row = await customSelect(
+      'SELECT first_line, line_count, data FROM phile_text '
+      'WHERE phile_id = ? AND first_line <= ? '
+      'ORDER BY first_line DESC LIMIT 1',
+      variables: [Variable.withInt(phileId), Variable.withInt(line)],
+      readsFrom: {phileTextChunks},
+    ).getSingleOrNull();
+    if (row == null) return null;
+    final first = row.read<int>('first_line');
+    if (line >= first + row.read<int>('line_count')) return null;
+    return _lineInChunk(row.read<Uint8List>('data'), line - first);
   }
 
   /// Every line of a phile, for the reader.
