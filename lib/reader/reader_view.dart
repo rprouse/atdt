@@ -10,6 +10,7 @@ import 'package:flutter/widgets.dart';
 import '../ingest/phile_text.dart';
 import '../layout/layout_calculator.dart';
 import '../layout/reading_position.dart';
+import '../layout/text_block.dart';
 import 'reader_font.dart';
 
 const double readerHorizontalPadding = 8;
@@ -21,11 +22,23 @@ class ReaderDiagnostics {
     required this.layout,
     required this.position,
     required this.advanceRatio,
+    this.viewportHeight = 0,
+    this.lineCount = 0,
   });
 
   final ReaderLayout layout;
   final ReadingPosition position;
   final double advanceRatio;
+  final double viewportHeight;
+  final int lineCount;
+
+  /// How far through the phile the bottom of the screen is, 0 to 1.
+  double get progress {
+    if (lineCount == 0) return 1;
+    final visible = viewportHeight / layout.lineHeight;
+    final bottom = position.topLineIndex + position.fractionIntoLine + visible;
+    return (bottom / lineCount).clamp(0, 1).toDouble();
+  }
 }
 
 /// The 80-column reader.
@@ -44,7 +57,10 @@ class ReaderView extends StatefulWidget {
     super.key,
     this.onVerticalUserScroll,
     this.diagnostics,
+    this.onPositionChanged,
     this.initialPosition = const ReadingPosition.top(),
+    this.selection,
+    this.selectionColor,
   });
 
   final PhileText text;
@@ -56,22 +72,72 @@ class ReaderView extends StatefulWidget {
 
   /// Receives layout and position updates for the debug overlay.
   final ValueNotifier<ReaderDiagnostics?>? diagnostics;
+
+  /// Called as the user scrolls, with the position to save.
+  final ValueChanged<ReadingPosition>? onPositionChanged;
   final ReadingPosition initialPosition;
+
+  /// The block a long press selected, for copying; null when none is.
+  /// Supplying it turns long-press selection on.
+  final ValueNotifier<LineBlock?>? selection;
+
+  /// Behind selected lines.
+  final Color? selectionColor;
 
   @override
   State<ReaderView> createState() => ReaderViewState();
 }
 
-@visibleForTesting
+/// Pinch zoom stops here; beyond 4x the 80-column view is mostly scrolling.
+const double maxReaderZoom = 4;
+
+/// Public so the reader screen can page ([page]) and tests can inspect
+/// layout and position.
 class ReaderViewState extends State<ReaderView> {
   late ReadingPosition _position = widget.initialPosition;
   ReaderLayout? _layout;
+  double _viewportHeight = 0;
   Object? _epoch;
   ScrollController? _vertical;
   ScrollController? _horizontal;
 
+  // Zoom: committed when a pinch ends; previewed as a transform during it,
+  // so the text is laid out once per pinch, not once per frame.
+  double _zoom = 1;
+  double? _pinch;
+  double? _layoutWidth;
+  double _pinchStartDistance = 0;
+  final _pointers = <int, Offset>{};
+
   ReadingPosition get position => _position;
   ReaderLayout? get layout => _layout;
+  double get zoom => _zoom;
+
+  /// Zooms to [zoom] (clamped to fit..[maxReaderZoom]), keeping the top
+  /// line and column. Pinches call this when they end.
+  void setZoom(double zoom) =>
+      setState(() => _zoom = zoom.clamp(1, maxReaderZoom).toDouble());
+
+  /// Scrolls one screen down (1) or up (-1), keeping one line of overlap.
+  Future<void> page(int direction) async {
+    final layout = _layout;
+    final v = _vertical;
+    if (layout == null || v == null || !v.hasClients) return;
+    final step = math.max(
+      layout.lineHeight,
+      _viewportHeight - layout.lineHeight,
+    );
+    final target = (v.offset + direction * step).clamp(
+      0.0,
+      v.position.maxScrollExtent,
+    );
+    await v.animateTo(
+      target,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+    );
+  }
+
   ScrollController? get verticalController => _vertical;
   ScrollController? get horizontalController => _horizontal;
 
@@ -108,13 +174,35 @@ class ReaderViewState extends State<ReaderView> {
           return const SizedBox.expand();
         }
 
+        // Zoom resets to fit on rotation (or any other width change).
+        if (_layoutWidth != null && _layoutWidth != constraints.maxWidth) {
+          _zoom = 1;
+        }
+        _layoutWidth = constraints.maxWidth;
+
         final advanceRatio = measureAdvanceRatio(widget.font);
         final layout = computeLayout(
           viewport: viewport,
           font: widget.font.metrics(advanceRatio),
           longestLineColumns: widget.text.longestLineColumns,
+          zoom: _zoom,
         );
-        _ensureControllers(layout, constraints, advanceRatio);
+        // The text block plus its right margin; at fit that is exactly the
+        // viewport, and zoom or long lines make it scroll sideways.
+        final needed =
+            layout.textLeft +
+            layout.contentWidth +
+            insets.right +
+            readerHorizontalPadding;
+        final contentWidth = needed - constraints.maxWidth < 0.5
+            ? constraints.maxWidth
+            : needed;
+        _ensureControllers(
+          layout,
+          constraints,
+          advanceRatio,
+          maxHorizontal: contentWidth - constraints.maxWidth,
+        );
 
         // Characters the font lacks are drawn as its own placeholder glyph,
         // never via system fallback, whose different width would shift
@@ -123,11 +211,68 @@ class ReaderViewState extends State<ReaderView> {
         final coverage = widget.font.coverage;
         final substitute = !coverage.coversAll(widget.text.inventory);
 
-        // At fit the content is exactly the viewport; overflow columns add
-        // their width on the right.
-        final contentWidth =
-            constraints.maxWidth +
-            (layout.contentColumns - fitColumns) * layout.glyphAdvance;
+        // Two fingers on the text are a pinch, not a scroll.
+        final physics = _pointers.length >= 2
+            ? const NeverScrollableScrollPhysics()
+            : null;
+        final selection = widget.selection;
+
+        Widget list() => ListView.builder(
+          key: ValueKey(('v', _epoch)),
+          controller: _vertical,
+          physics: physics,
+          // Explicit zero padding: the default adds MediaQuery padding,
+          // which changes when the status bar hides.
+          padding: EdgeInsets.zero,
+          itemExtent: layout.lineHeight,
+          itemCount: widget.text.lines.length,
+          itemBuilder: (context, index) {
+            final line = widget.text.lines[index];
+            Widget row = _line(
+              substitute ? coverage.substitute(line) : line,
+              layout,
+            );
+            if (selection == null) return row;
+            if (selection.value?.contains(index) ?? false) {
+              row = ColoredBox(
+                key: ValueKey('selected-$index'),
+                color: widget.selectionColor ?? const Color(0x664488FF),
+                child: row,
+              );
+            }
+            return GestureDetector(
+              onLongPress: () =>
+                  selection.value = blockAround(widget.text.lines, index),
+              child: row,
+            );
+          },
+        );
+
+        Widget content = SingleChildScrollView(
+          key: ValueKey(('h', _epoch)),
+          controller: _horizontal,
+          scrollDirection: Axis.horizontal,
+          physics: physics,
+          child: SizedBox(
+            width: contentWidth,
+            height: constraints.maxHeight,
+            child: selection == null
+                ? list()
+                : ValueListenableBuilder<LineBlock?>(
+                    valueListenable: selection,
+                    builder: (context, _, _) => list(),
+                  ),
+          ),
+        );
+        if (_pinch case final scale?) {
+          // Preview anchored top-left, like the committed zoom, which
+          // keeps the top line and column.
+          content = Transform.scale(
+            scale: scale,
+            alignment: Alignment.topLeft,
+            child: content,
+          );
+        }
 
         return MediaQuery.removePadding(
           context: context,
@@ -135,31 +280,14 @@ class ReaderViewState extends State<ReaderView> {
           removeBottom: true,
           removeLeft: true,
           removeRight: true,
-          child: NotificationListener<UserScrollNotification>(
-            onNotification: _onUserScroll,
-            child: SingleChildScrollView(
-              key: ValueKey(('h', _epoch)),
-              controller: _horizontal,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: contentWidth,
-                height: constraints.maxHeight,
-                child: ListView.builder(
-                  key: ValueKey(('v', _epoch)),
-                  controller: _vertical,
-                  // Explicit zero padding: the default adds MediaQuery
-                  // padding, which changes when the status bar hides.
-                  padding: EdgeInsets.zero,
-                  itemExtent: layout.lineHeight,
-                  itemCount: widget.text.lines.length,
-                  itemBuilder: (context, index) => _line(
-                    substitute
-                        ? coverage.substitute(widget.text.lines[index])
-                        : widget.text.lines[index],
-                    layout,
-                  ),
-                ),
-              ),
+          child: Listener(
+            onPointerDown: _pointerDown,
+            onPointerMove: _pointerMove,
+            onPointerUp: _pointerEnd,
+            onPointerCancel: _pointerEnd,
+            child: NotificationListener<UserScrollNotification>(
+              onNotification: _onUserScroll,
+              child: ClipRect(child: content),
             ),
           ),
         );
@@ -209,8 +337,9 @@ class ReaderViewState extends State<ReaderView> {
   void _ensureControllers(
     ReaderLayout layout,
     BoxConstraints constraints,
-    double advanceRatio,
-  ) {
+    double advanceRatio, {
+    required double maxHorizontal,
+  }) {
     final epoch = (
       layout.lineHeight,
       layout.glyphAdvance,
@@ -221,8 +350,13 @@ class ReaderViewState extends State<ReaderView> {
       identityHashCode(widget.text),
     );
     _layout = layout;
+    _viewportHeight = constraints.maxHeight;
     if (epoch == _epoch && _vertical != null) {
-      _publish(advanceRatio);
+      // After the frame: listeners (the chrome's progress) rebuild, and
+      // they must not be marked dirty while this widget is building.
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _publish(advanceRatio),
+      );
       return;
     }
     _epoch = epoch;
@@ -240,9 +374,6 @@ class ReaderViewState extends State<ReaderView> {
       0,
       widget.text.lines.length * layout.lineHeight - constraints.maxHeight,
     );
-    final maxHorizontal =
-        (layout.contentColumns - fitColumns) * layout.glyphAdvance;
-
     final oldVertical = _vertical;
     final oldHorizontal = _horizontal;
     _vertical = ScrollController(
@@ -272,6 +403,43 @@ class ReaderViewState extends State<ReaderView> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _publish(advanceRatio));
   }
 
+  double get _pointerSpread {
+    final points = _pointers.values.take(2).toList();
+    return (points[0] - points[1]).distance;
+  }
+
+  void _pointerDown(PointerDownEvent event) {
+    _pointers[event.pointer] = event.localPosition;
+    if (_pointers.length == 2) {
+      _pinchStartDistance = math.max(1, _pointerSpread);
+      setState(() => _pinch = 1);
+    }
+  }
+
+  void _pointerMove(PointerMoveEvent event) {
+    if (!_pointers.containsKey(event.pointer)) return;
+    _pointers[event.pointer] = event.localPosition;
+    if (_pinch == null || _pointers.length < 2) return;
+    final scale = (_pointerSpread / _pinchStartDistance).clamp(
+      1 / _zoom,
+      maxReaderZoom / _zoom,
+    );
+    setState(() => _pinch = scale.toDouble());
+  }
+
+  void _pointerEnd(PointerEvent event) {
+    _pointers.remove(event.pointer);
+    final scale = _pinch;
+    if (scale == null || _pointers.length >= 2) {
+      if (_pointers.length < 2) setState(() {});
+      return;
+    }
+    setState(() {
+      _pinch = null;
+      _zoom = (_zoom * scale).clamp(1, maxReaderZoom).toDouble();
+    });
+  }
+
   void _onScroll() {
     final layout = _layout;
     final v = _vertical;
@@ -285,6 +453,7 @@ class ReaderViewState extends State<ReaderView> {
       glyphAdvance: layout.glyphAdvance,
     );
     _publish(measureAdvanceRatio(widget.font));
+    widget.onPositionChanged?.call(_position);
   }
 
   void _publish(double advanceRatio) {
@@ -294,6 +463,8 @@ class ReaderViewState extends State<ReaderView> {
       layout: layout,
       position: _position,
       advanceRatio: advanceRatio,
+      viewportHeight: _viewportHeight,
+      lineCount: widget.text.lines.length,
     );
   }
 

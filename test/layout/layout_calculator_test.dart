@@ -195,6 +195,58 @@ void main() {
     });
   });
 
+  group('zoom', () {
+    test('vector fonts scale continuously from fit', () {
+      final layout = computeLayout(
+        viewport: _viewport(width: 400, padding: 8),
+        font: _vector,
+        longestLineColumns: 80,
+        zoom: 1.5,
+      );
+      expect(layout.fontSize, closeTo(12, 1e-9));
+      expect(layout.zoom, 1.5);
+      // The 80 columns are now wider than the screen; overflow scrolls.
+      expect(layout.blockWidth, closeTo(576, 1e-9));
+      expect(layout.textLeft, 8);
+    });
+
+    test('never zooms out past fit', () {
+      final layout = computeLayout(
+        viewport: _viewport(width: 400, padding: 8),
+        font: _vector,
+        longestLineColumns: 80,
+        zoom: 0.5,
+      );
+      expect(layout.fontSize, closeTo(8, 1e-9));
+      expect(layout.zoom, 1);
+    });
+
+    test('integer-scale fonts step to whole scales', () {
+      // Fit is scale 4 at this width (see above).
+      final layout = computeLayout(
+        viewport: _viewport(width: 900, padding: 8, dpr: 3),
+        font: _pixel,
+        longestLineColumns: 80,
+        zoom: 1.4,
+      );
+      expect(layout.integerScale, 6); // round(4 * 1.4) = 6
+      expect(layout.zoom, 1.5);
+      expect(layout.glyphAdvance * 3, closeTo(48, 1e-9));
+      // Wider than the screen: no centring, still on the pixel grid.
+      expect(layout.textLeft * 3, closeTo(24, 1e-9));
+    });
+
+    test('a small pinch on a pixel font stays at the fit scale', () {
+      final layout = computeLayout(
+        viewport: _viewport(width: 900, padding: 8, dpr: 3),
+        font: _pixel,
+        longestLineColumns: 80,
+        zoom: 1.1,
+      );
+      expect(layout.integerScale, 4);
+    });
+  });
+
   group('invalid input', () {
     test('rejects viewports with no room for text', () {
       expect(

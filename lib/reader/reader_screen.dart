@@ -1,16 +1,23 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../download/download_controller.dart';
+import '../layout/reading_position.dart';
+import '../layout/text_block.dart';
 import '../library/library_providers.dart';
+import '../storage/archive_database.dart';
 import 'debug_overlay.dart';
 import 'reader_font.dart';
 import 'reader_settings.dart';
 import 'reader_theme.dart';
 import 'reader_view.dart';
+import 'volume_keys.dart';
 
 /// Reads one stored phile, with chrome overlaid on the text.
 class ReaderScreen extends ConsumerStatefulWidget {
@@ -32,9 +39,105 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   /// Fonts whose coverage notice was dismissed for this phile.
   final _dismissedNotices = <String>{};
 
+  // Reading position: saved shortly after scrolling stops, when the reader
+  // closes, and when the app goes to the background (it may be killed
+  // there without warning).
+  // Read eagerly: ref cannot be used in dispose, where the last save runs.
+  late final ArchiveDatabase _db;
+  late final AppLifecycleListener _lifecycle;
+  Timer? _saveTimer;
+  ReadingPosition? _unsaved;
+
+  @override
+  void initState() {
+    super.initState();
+    _db = ref.read(archiveDatabaseProvider);
+    _lifecycle = AppLifecycleListener(onInactive: _savePosition);
+
+    // Orientation and keep-awake apply while the reader is open, following
+    // changes made from its chrome.
+    final settings = ref.read(readerSettingsProvider);
+    _applyOrientation(settings.orientation);
+    _applyKeepAwake(settings.keepAwake);
+    _applyVolumePaging(settings.volumePaging);
+    VolumeKeys.listen(_page);
+    ref
+      ..listenManual(
+        readerSettingsProvider.select((s) => s.orientation),
+        (_, mode) => _applyOrientation(mode),
+      )
+      ..listenManual(
+        readerSettingsProvider.select((s) => s.keepAwake),
+        (_, on) => _applyKeepAwake(on),
+      )
+      ..listenManual(
+        readerSettingsProvider.select((s) => s.volumePaging),
+        (_, on) => _applyVolumePaging(on),
+      );
+  }
+
+  void _applyVolumePaging(bool on) =>
+      unawaited(VolumeKeys.setEnabled(on && isAndroid));
+
+  void _page(int direction) =>
+      unawaited(_readerKey.currentState?.page(direction));
+
+  // Forcing landscape or portrait works with the system rotation lock on,
+  // which is the point of the control.
+  void _applyOrientation(OrientationMode mode) =>
+      unawaited(SystemChrome.setPreferredOrientations(mode.orientations));
+
+  void _applyKeepAwake(bool on) =>
+      unawaited(WakelockPlus.toggle(enable: on).catchError((Object _) {}));
+
+  final _readerKey = GlobalKey<ReaderViewState>();
+  final _selection = ValueNotifier<LineBlock?>(null);
+
+  Future<void> _copySelection(List<String> lines) async {
+    final block = _selection.value;
+    if (block == null) return;
+    await Clipboard.setData(ClipboardData(text: block.textOf(lines)));
+    _selection.value = null;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Copied ${block.length} ${block.length == 1 ? 'line' : 'lines'}',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _onPosition(ReadingPosition position) {
+    _unsaved = position;
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 500), _savePosition);
+  }
+
+  void _savePosition() {
+    _saveTimer?.cancel();
+    final position = _unsaved;
+    if (position == null) return;
+    _unsaved = null;
+    unawaited(
+      _db
+          .saveReadingPosition(widget.phileId, position, at: DateTime.now())
+          .catchError((Object _) {}),
+    );
+  }
+
   @override
   void dispose() {
+    _savePosition();
+    _lifecycle.dispose();
     _diagnostics.dispose();
+    _selection.dispose();
+    // The library rotates freely, and only reading keeps the screen on.
+    unawaited(SystemChrome.setPreferredOrientations(DeviceOrientation.values));
+    unawaited(WakelockPlus.disable().catchError((Object _) {}));
+    VolumeKeys.stopListening();
+    unawaited(VolumeKeys.setEnabled(false));
     // Leaving the reader with the chrome hidden must not strand the app in
     // immersive mode.
     if (!_chromeVisible) {
@@ -69,14 +172,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final Widget body = switch (phile) {
       AsyncData(:final value) => GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTap: () => _setChromeVisible(!_chromeVisible),
+        onTap: () {
+          // A tap clears a selection before it toggles the chrome.
+          if (_selection.value != null) {
+            _selection.value = null;
+          } else {
+            _setChromeVisible(!_chromeVisible);
+          }
+        },
         child: ReaderView(
-          key: const ValueKey('reader'),
+          key: _readerKey,
           text: value.text,
           font: font,
           foreground: theme.foreground,
           onVerticalUserScroll: _onVerticalUserScroll,
           diagnostics: _diagnostics,
+          onPositionChanged: _onPosition,
+          initialPosition: value.position ?? const ReadingPosition.top(),
+          selection: _selection,
+          selectionColor: theme.selection,
         ),
       ),
       AsyncError(:final error) => Center(
@@ -103,10 +217,34 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 offset: _chromeVisible ? Offset.zero : const Offset(0, -1),
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOut,
-                child: _TopBar(title: title, theme: theme),
+                child: _TopBar(
+                  title: title,
+                  theme: theme,
+                  diagnostics: _diagnostics,
+                ),
               ),
             ),
           ),
+          if (phile case AsyncData(:final value))
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: SafeArea(
+                top: false,
+                child: ValueListenableBuilder<LineBlock?>(
+                  valueListenable: _selection,
+                  builder: (context, block, _) => block == null
+                      ? const SizedBox.shrink()
+                      : _CopyBar(
+                          block: block,
+                          theme: theme,
+                          onCopy: () => _copySelection(value.text.lines),
+                          onCancel: () => _selection.value = null,
+                        ),
+                ),
+              ),
+            ),
           if (phile case AsyncData(:final value)
               when !_dismissedNotices.contains(font.id) &&
                   !font.coverage.coversAll(value.text.inventory))
@@ -152,10 +290,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 }
 
 class _TopBar extends ConsumerWidget {
-  const _TopBar({required this.title, required this.theme});
+  const _TopBar({
+    required this.title,
+    required this.theme,
+    required this.diagnostics,
+  });
 
   final String title;
   final ReaderTheme theme;
+  final ValueNotifier<ReaderDiagnostics?> diagnostics;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -181,6 +324,14 @@ class _TopBar extends ConsumerWidget {
                   key: const ValueKey('reader-title'),
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: theme.foreground, fontSize: 16),
+                ),
+              ),
+              ValueListenableBuilder<ReaderDiagnostics?>(
+                valueListenable: diagnostics,
+                builder: (context, d, _) => Text(
+                  d == null ? '' : '${(d.progress * 100).round()}%',
+                  key: const ValueKey('reader-progress'),
+                  style: TextStyle(color: theme.dim, fontSize: 14),
                 ),
               ),
               _Menu<String>(
@@ -322,3 +473,57 @@ class _CoverageNotice extends ConsumerWidget {
     );
   }
 }
+
+/// Offered after a long press selects a block of lines.
+class _CopyBar extends StatelessWidget {
+  const _CopyBar({
+    required this.block,
+    required this.theme,
+    required this.onCopy,
+    required this.onCancel,
+  });
+
+  final LineBlock block;
+  final ReaderTheme theme;
+  final VoidCallback onCopy;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    key: const ValueKey('copy-bar'),
+    color: theme.background,
+    elevation: 4,
+    shape: RoundedRectangleBorder(
+      side: BorderSide(color: theme.accent),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${block.length} ${block.length == 1 ? 'line' : 'lines'} '
+              'selected',
+              style: TextStyle(color: theme.foreground),
+            ),
+          ),
+          TextButton(
+            onPressed: onCancel,
+            style: TextButton.styleFrom(foregroundColor: theme.dim),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: onCopy,
+            style: TextButton.styleFrom(foregroundColor: theme.accent),
+            child: const Text('Copy'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Volume-button paging is Android-only (spec): iOS gives apps no such hook.
+bool get isAndroid =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;

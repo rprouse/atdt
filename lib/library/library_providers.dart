@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../download/download_controller.dart';
 import '../ingest/phile_text.dart';
+import '../layout/reading_position.dart';
 import '../storage/archive_database.dart';
 
 /// Every known issue, newest first; updates as issues download.
@@ -14,10 +15,13 @@ final issuePhilesProvider = StreamProvider.family<List<Phile>, int>(
 );
 
 class StoredPhile {
-  const StoredPhile({required this.meta, required this.text});
+  const StoredPhile({required this.meta, required this.text, this.position});
 
   final Phile meta;
   final PhileText text;
+
+  /// Where the reader left off, if they have opened it before.
+  final ReadingPosition? position;
 }
 
 /// A phile's text, loaded whole for the reader. Disposed when the reader
@@ -30,6 +34,7 @@ final storedPhileProvider = FutureProvider.autoDispose.family<StoredPhile, int>(
     final lines = await db.readAllLines(phileId);
     return StoredPhile(
       meta: meta,
+      position: await db.readingPosition(phileId),
       text: PhileText(
         lines: lines,
         longestLineColumns: meta.longestLine,
@@ -50,3 +55,8 @@ String formatReleaseDate(DateTime date) {
   final d = date.toUtc();
   return '${d.day} ${_months[d.month - 1]} ${d.year}';
 }
+
+/// The most recently read phile, for "continue reading".
+final lastReadProvider = StreamProvider<LastRead?>(
+  (ref) => ref.watch(archiveDatabaseProvider).watchLastRead(),
+);
