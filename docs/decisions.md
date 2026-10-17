@@ -245,3 +245,20 @@ ferent`).
   - **Custom themes:** create (starting from the current theme), edit and delete in Settings. The editor has an HSV + hex colour picker and a live preview of all five colours, in the reader font with placeholder substitution. Built-ins can't be edited. Custom themes are JSON in the settings table (`themes.custom`), and malformed entries are skipped. The choice is saved as `reader.theme`; deleting the theme in use falls back to the default.
   - `main` waits (up to 2 s) for saved settings and themes before the first frame, so there is no flash. A storage error never blocks startup.
   - Goldens: the reader in each built-in theme (`theme_<id>.png`).
+
+## 2026-10-17: Reader polish (Stage G)
+
+- **Checked (Verify: selection in lazy lists):** a probe wrapping `SelectionArea` around a 1,000-line `ListView.builder` (Flutter 3.47.7), then select-all and copy. On the Android emulator: volume-key paging, position restore across app sessions, and the orientation control.
+- **Found:**
+  - **Selection only reaches built lines.** Select-all copied lines 0 to 42 of 1,000, which is the viewport plus the cache extent. Lines the lazy list has not built are not selectable.
+  - **Separate `Text` widgets are joined with no newline** ("line 0line 1…"), which would corrupt fixed-width text.
+  - **Volume keys reach Android first.** Returning `KeyEventResult.handled` from a Dart `Focus.onKeyEvent` did not stop the volume changing (5 → 4), and the reader didn't page. The framework never handled the key, so the embedding passed it back to Android.
+  - Gradle's Kotlin incremental caches fail to close ("Could not close incremental caches") when the pub cache (C:) and the project (D:) are on different drives.
+- **Changed:**
+  - **Copy is block-based, not `SelectionArea`.** A long press selects the contiguous non-blank lines around the pressed line (`lib/layout/text_block.dart`, pure Dart). A copy bar offers Copy and Cancel, and a tap clears the selection. The copied text is the stored lines joined with `\n`, byte for byte, leading whitespace included. Cross-screen free selection is not attempted.
+  - **Volume paging is native.** `MainActivity.dispatchKeyEvent` consumes `KEYCODE_VOLUME_UP` and `KEYCODE_VOLUME_DOWN` only while a gate is on. The gate is set over the `org.prouse.atdt/volume_keys` channel: on while a reader is open with the setting on (Android only), off when it closes. Key-down (not repeats) calls `page(±1)` in Dart, which animates by one screen less one line. Verified on the emulator: the reader pages both ways, the volume is unchanged and no volume panel appears; after the reader closes the keys change the volume again.
+  - **Orientation is scoped to the reader.** The chosen mode applies while a reader is open (it works with the system rotation lock on) and is released to all orientations on exit, so the library always rotates freely. Choosing it in Settings only stores it.
+  - **Zoom** is a multiplier on the fit size, never below fit. Vector fonts scale continuously; integer-scale fonts round to whole scales. While pinching, a `Transform.scale` preview anchored at the top left is shown. On release the zoom commits as a new layout, restored from the position tuple, so the top line holds. Zoom resets to fit when the available width changes (rotation). Extra width scrolls horizontally.
+  - **Reading position** is saved 500 ms after scrolling stops, when the reader closes, and when the app becomes inactive. "Continue reading" shows the most recently saved phile; its percentage is based on the top line. A phile that is opened but never scrolled is not recorded.
+  - **Keep-awake** (`wakelock_plus`) is on by default while a reader is open, and released on exit.
+  - `android/gradle.properties` sets `kotlin.incremental=false`.

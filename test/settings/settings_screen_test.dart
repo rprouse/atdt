@@ -17,7 +17,7 @@ Future<ProviderContainer> _pump(
   Widget home = const SettingsScreen(),
   ArchiveDatabase? db,
 }) async {
-  tester.view.physicalSize = const Size(1170, 5000);
+  tester.view.physicalSize = const Size(1170, 8000);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   final database = db ?? memoryArchiveDatabase();
@@ -69,10 +69,27 @@ void main() {
     expect(container.read(currentFontProvider).id, 'c64_pro_mono');
     expect(container.read(currentThemeProvider).id, 'paper');
     expect(settings.orientation, OrientationMode.landscape);
-    expect(orientations.single, [
-      'DeviceOrientation.landscapeLeft',
-      'DeviceOrientation.landscapeRight',
-    ]);
+    // Orientation applies inside the reader only; choosing it in Settings
+    // must not rotate the library.
+    expect(orientations, isEmpty);
+  });
+
+  testWidgets('reading preferences persist', (tester) async {
+    final db = memoryArchiveDatabase();
+    addTearDown(db.close);
+    final container = await _pump(tester, db: db);
+    expect(container.read(readerSettingsProvider).keepAwake, isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('keep-awake')));
+    await tester.tap(find.byKey(const ValueKey('orientation-portrait')));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(const SizedBox());
+    final relaunched = await _pump(tester, db: db);
+    await relaunched.read(readerSettingsProvider.notifier).restored;
+    final settings = relaunched.read(readerSettingsProvider);
+    expect(settings.keepAwake, isFalse);
+    expect(settings.orientation, OrientationMode.portrait);
   });
 
   testWidgets('every manifest font is offered, defaulting to the first', (

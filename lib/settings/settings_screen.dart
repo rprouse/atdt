@@ -3,13 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../reader/about.dart';
 import '../reader/reader_font.dart';
+import '../reader/reader_screen.dart' show isAndroid;
 import '../reader/reader_settings.dart';
 import '../reader/reader_theme.dart';
 import 'credits_screen.dart';
 import 'theme_editor_screen.dart';
 
-/// Reader preferences. Stage E/F/G grow this; for now it carries over the
-/// spike's font, theme and orientation menus. Not yet persisted (Stage G).
+/// Reader preferences: font, theme, orientation and reading behaviour.
+/// Every choice is persisted in the settings table.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -109,6 +110,22 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          section('Reading'),
+          SwitchListTile(
+            key: const ValueKey('keep-awake'),
+            title: const Text('Keep the screen on'),
+            subtitle: const Text('While a phile is open'),
+            value: settings.keepAwake,
+            onChanged: notifier.setKeepAwake,
+          ),
+          if (isAndroid)
+            SwitchListTile(
+              key: const ValueKey('volume-paging'),
+              title: const Text('Volume buttons turn pages'),
+              subtitle: const Text('Volume down for the next screen'),
+              value: settings.volumePaging,
+              onChanged: notifier.setVolumePaging,
+            ),
           section('Developer'),
           SwitchListTile(
             title: const Text('Layout debug overlay'),

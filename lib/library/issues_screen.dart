@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../archive/archive_downloader.dart';
 import '../download/download_controller.dart';
 import '../download/download_screen.dart';
+import '../reader/reader_screen.dart';
 import '../settings/settings_screen.dart';
 import '../storage/archive_database.dart';
 import 'issue_screen.dart';
@@ -42,6 +43,8 @@ class IssuesScreen extends ConsumerWidget {
         AsyncData(value: final list) => Column(
           children: [
             if (running) _DownloadBanner(progress: progress),
+            if (ref.watch(lastReadProvider).value case final last?)
+              _ContinueReading(last: last),
             Expanded(child: _IssueList(issues: list)),
           ],
         ),
@@ -172,6 +175,35 @@ class _FirstLaunch extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Returns to the last phile read, at the line where reading stopped.
+class _ContinueReading extends StatelessWidget {
+  const _ContinueReading({required this.last});
+
+  final LastRead last;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      key: const ValueKey('continue-reading'),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      color: scheme.surfaceContainerHighest,
+      child: ListTile(
+        leading: Icon(Icons.bookmark_outline, color: scheme.primary),
+        title: Text(last.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          'Continue reading · Issue ${last.issue} · ${last.percent}%',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _push(
+          context,
+          ReaderScreen(phileId: last.phileId, title: last.title),
+        ),
+      ),
     );
   }
 }

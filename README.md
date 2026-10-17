@@ -27,8 +27,8 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 | C | Archive download and storage | Done; profile-mode perf check pending |
 | D | Library navigation | Done |
 | E | Font system | Done |
-| F | Themes | In review |
-| G | Reader polish | Not started |
+| F | Themes | Done |
+| G | Reader polish | In review |
 | H | Search | Not started |
 | I | Section navigation | Not started |
 | J | CRT effect | Not started |
@@ -105,6 +105,7 @@ Run each integration test file on its own; device runs do not handle several fil
 flutter test integration_test/app_test.dart -d <device>
 flutter test integration_test/reader_rotation_test.dart -d <device>
 flutter test integration_test/storage_perf_test.dart -d <device>   # readLine < 5 ms (asserted in profile/release)
+flutter test integration_test/reader_polish_test.dart -d <device>   # position across sessions, orientation
 ```
 
 ### Scrolling performance
@@ -137,7 +138,7 @@ test/
   archive/fixtures/   Synthetic issue tarball
   reader/goldens/   Golden images (Linux-rendered)
   architecture_test.dart   Fails if a pure-Dart folder imports Flutter
-integration_test/   Device tests (rotation, storage and scroll performance)
+integration_test/   Device tests (rotation, position, orientation, storage and scroll performance)
 test_driver/   Driver for the performance test
 tool/          Developer scripts (fixtures, archive batch run, goldens)
 docs/          Spec, decisions log, spike report
