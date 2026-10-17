@@ -21,7 +21,7 @@ void main() {
   testWidgets('launches into the library and opens a stored phile', (
     tester,
   ) async {
-    app.main();
+    await app.main();
     await pumpUntil(tester, find.byType(IssuesScreen));
     expect(find.byType(IssuesScreen), findsOneWidget);
 

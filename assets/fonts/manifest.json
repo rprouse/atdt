@@ -1,0 +1,75 @@
+{
+  "_comment": "Reader fonts. Add a font by dropping its file in files/ and its licence in licences/, then adding an entry here; no code changes. Paths are relative to assets/fonts/. The first entry is the default. lineHeightRatio is the font's own ascent + descent, so box-drawing verticals join.",
+  "fonts": [
+    {
+      "id": "jetbrains_mono",
+      "displayName": "JetBrains Mono",
+      "family": "JetBrainsMono",
+      "files": ["files/JetBrainsMono-Regular.ttf"],
+      "integerScale": false,
+      "lineHeightRatio": 1.32,
+      "licence": {
+        "name": "SIL Open Font License 1.1",
+        "url": "https://openfontlicense.org",
+        "file": "licences/jetbrains_mono-OFL.txt"
+      },
+      "attribution": "JetBrains Mono 2.304, copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)."
+    },
+    {
+      "id": "ibm_plex_mono",
+      "displayName": "IBM Plex Mono",
+      "family": "IBMPlexMono",
+      "files": ["files/IBMPlexMono-Regular.ttf"],
+      "integerScale": false,
+      "lineHeightRatio": 1.3,
+      "licence": {
+        "name": "SIL Open Font License 1.1",
+        "url": "https://openfontlicense.org",
+        "file": "licences/ibm_plex_mono-OFL.txt"
+      },
+      "attribution": "IBM Plex Mono, copyright 2017 IBM Corp., with Reserved Font Name \"Plex\" (https://github.com/IBM/plex)."
+    },
+    {
+      "id": "bigblue_terminal_plus",
+      "displayName": "BigBlue Terminal",
+      "family": "BigBlueTerminalPlus",
+      "files": ["files/BigBlue_TerminalPlus.TTF"],
+      "integerScale": false,
+      "lineHeightRatio": 1.0,
+      "licence": {
+        "name": "CC BY-SA 4.0",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "file": "licences/bigblue_terminal-CC-BY-SA-4.0.txt"
+      },
+      "attribution": "BigBlue TerminalPlus 1.0 by VileR (https://int10h.org/), based on the IBM 8x14 EGA/VGA charset."
+    },
+    {
+      "id": "terminus",
+      "displayName": "Terminus",
+      "family": "TerminusTTF",
+      "files": ["files/TerminusTTF-4.49.3.ttf"],
+      "integerScale": false,
+      "lineHeightRatio": 1.0,
+      "licence": {
+        "name": "SIL Open Font License 1.1",
+        "url": "https://openfontlicense.org",
+        "file": "licences/terminus-OFL.txt"
+      },
+      "attribution": "Terminus (TTF) 4.49.3, copyright 2010 Dimitar Toshkov Zhekov and 2011-2023 Tilman Blumenbach, with Reserved Font Names \"Terminus Font\" and \"Terminus (TTF)\" (https://files.ax86.net/terminus-ttf/)."
+    },
+    {
+      "id": "c64_pro_mono",
+      "displayName": "C64 Pro Mono",
+      "family": "C64ProMono",
+      "files": ["files/C64_Pro_Mono-STYLE.ttf"],
+      "integerScale": false,
+      "lineHeightRatio": 1.0,
+      "licence": {
+        "name": "Style C64 TrueType licence",
+        "url": "https://style64.org/c64-truetype/license",
+        "file": "licences/c64_pro_mono-license.txt"
+      },
+      "attribution": "C64 Pro Mono 1.2.1, (c) 2010-2019 Style (https://style64.org/c64-truetype). Included unmodified under its original file name, as its licence requires, which allows it only in software that is free to end users."
+    }
+  ]
+}

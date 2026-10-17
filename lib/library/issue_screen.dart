@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../reader/reader_font.dart';
 import '../reader/reader_screen.dart';
 import 'library_providers.dart';
 
@@ -14,6 +15,7 @@ class IssueScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final philes = ref.watch(issuePhilesProvider(issue));
+    final numberFont = ref.watch(fontRegistryProvider).defaultFont.family;
     return Scaffold(
       appBar: AppBar(title: Text('Issue $issue')),
       body: switch (philes) {
@@ -26,9 +28,9 @@ class IssueScreen extends ConsumerWidget {
               key: ValueKey('phile-${phile.number}'),
               leading: Text(
                 phile.number.toString().padLeft(2),
-                style: const TextStyle(
-                  fontFamily: 'JetBrainsMono',
-                  fontFeatures: [FontFeature.tabularFigures()],
+                style: TextStyle(
+                  fontFamily: numberFont,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               title: Text(phile.title),

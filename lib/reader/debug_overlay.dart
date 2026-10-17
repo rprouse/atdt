@@ -8,11 +8,13 @@ class DebugOverlay extends StatelessWidget {
   const DebugOverlay({
     required this.diagnostics,
     required this.theme,
+    required this.fontFamily,
     super.key,
   });
 
   final ValueNotifier<ReaderDiagnostics?> diagnostics;
   final ReaderTheme theme;
+  final String fontFamily;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +57,7 @@ class DebugOverlay extends StatelessWidget {
               style: TextStyle(
                 color: theme.foreground,
                 fontSize: 11,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: fontFamily,
                 height: 1.3,
               ),
               child: Column(

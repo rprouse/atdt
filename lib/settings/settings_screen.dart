@@ -5,6 +5,7 @@ import '../reader/about.dart';
 import '../reader/reader_font.dart';
 import '../reader/reader_settings.dart';
 import '../reader/reader_theme.dart';
+import 'credits_screen.dart';
 
 /// Reader preferences. Stage E/F/G grow this; for now it carries over the
 /// spike's font, theme and orientation menus. Not yet persisted (Stage G).
@@ -15,6 +16,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(readerSettingsProvider);
     final notifier = ref.read(readerSettingsProvider.notifier);
+    final registry = ref.watch(fontRegistryProvider);
+    final currentFont = ref.watch(currentFontProvider);
     final heading = Theme.of(context).textTheme.titleSmall
         ?.copyWith(color: Theme.of(context).colorScheme.primary);
 
@@ -29,11 +32,11 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           section('Font'),
           RadioGroup<String>(
-            groupValue: settings.fontId,
+            groupValue: currentFont.id,
             onChanged: (id) => id == null ? null : notifier.setFont(id),
             child: Column(
               children: [
-                for (final font in readerFonts)
+                for (final font in registry.fonts)
                   RadioListTile<String>(
                     key: ValueKey('font-${font.id}'),
                     value: font.id,
@@ -60,7 +63,10 @@ class SettingsScreen extends ConsumerWidget {
                     key: ValueKey('theme-${theme.id}'),
                     value: theme.id,
                     title: Text(theme.displayName),
-                    secondary: _Swatch(theme: theme),
+                    secondary: _Swatch(
+                      theme: theme,
+                      family: registry.defaultFont.family,
+                    ),
                   ),
               ],
             ),
@@ -89,10 +95,18 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const Divider(),
           ListTile(
+            leading: const Icon(Icons.favorite_outline),
+            title: const Text('Credits'),
+            subtitle: const Text('Phrack, and every font with its licence'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const CreditsScreen()),
+            ),
+          ),
+          ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('About ATDT'),
-            subtitle: const Text('Credits and licences'),
-            onTap: () => showAtdtAbout(context),
+            subtitle: const Text('Version and licences'),
+            onTap: () => showAtdtAbout(context, registry),
           ),
         ],
       ),
@@ -101,9 +115,10 @@ class SettingsScreen extends ConsumerWidget {
 }
 
 class _Swatch extends StatelessWidget {
-  const _Swatch({required this.theme});
+  const _Swatch({required this.theme, required this.family});
 
   final ReaderTheme theme;
+  final String family;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -118,7 +133,7 @@ class _Swatch extends StatelessWidget {
       'ATDT',
       style: TextStyle(
         color: theme.foreground,
-        fontFamily: 'JetBrainsMono',
+        fontFamily: family,
         fontSize: 12,
       ),
     ),

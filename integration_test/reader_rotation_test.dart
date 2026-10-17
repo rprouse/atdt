@@ -4,6 +4,7 @@
 import 'package:atdt/reader/reader_font.dart';
 import 'package:atdt/reader/reader_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -14,6 +15,9 @@ const _landscape = Size(844, 390);
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  late FontRegistry fonts;
+  setUpAll(() async => fonts = await FontRegistry.loadFromBundle(rootBundle));
 
   final text = tenThousandLines();
 
@@ -43,8 +47,8 @@ void main() {
     tester.view.physicalSize = logical * dpr;
   }
 
-  for (final font in readerFonts) {
-    testWidgets('rotation holds line and column (${font.id})', (tester) async {
+  testWidgets('rotation holds line and column, for every font', (tester) async {
+    for (final font in fonts.fonts) {
       addTearDown(tester.view.reset);
       resize(tester, _portrait);
       final key = await open(tester, font);
@@ -62,16 +66,21 @@ void main() {
         expect(
           (after.topLineIndex - before.topLineIndex).abs(),
           lessThanOrEqualTo(1),
+          reason: font.id,
         );
-        expect(after.columnOffset, closeTo(before.columnOffset, 1e-6));
+        expect(
+          after.columnOffset,
+          closeTo(before.columnOffset, 1e-6),
+          reason: font.id,
+        );
       }
-    });
-  }
+    }
+  });
 
   testWidgets('switching fonts mid-file keeps the top line', (tester) async {
     addTearDown(tester.view.reset);
     resize(tester, _portrait);
-    final key = await open(tester, readerFonts.first);
+    final key = await open(tester, fonts.defaultFont);
     final layout = key.currentState!.layout!;
     key.currentState!.verticalController!.jumpTo(5000 * layout.lineHeight);
     await tester.pumpAndSettle();
@@ -82,7 +91,7 @@ void main() {
           body: ReaderView(
             key: key,
             text: text,
-            font: readerFonts.last,
+            font: fonts.fonts.last,
             foreground: Colors.green,
           ),
         ),

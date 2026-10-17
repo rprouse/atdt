@@ -5,10 +5,13 @@ import 'package:atdt/archive/archive_source.dart';
 import 'package:atdt/archive/issue_import.dart';
 import 'package:atdt/download/download_controller.dart';
 import 'package:atdt/ingest/phile_text.dart';
+import 'package:atdt/reader/reader_font.dart';
 import 'package:atdt/storage/archive_database.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+
+import 'reader_harness.dart';
 
 final Uint8List fixtureTarball = File('test/archive/fixtures/phrack99.tar.gz')
     .readAsBytesSync();
@@ -133,4 +136,6 @@ List<Override> archiveOverrides({
     (n, b) async => importIssueArchive(n, b),
   ),
   politeDelayProvider.overrideWithValue(Duration.zero),
+  // The real manifest fonts, when the test has loaded them.
+  if (testFontsLoaded) fontRegistryProvider.overrideWithValue(testFonts),
 ];
