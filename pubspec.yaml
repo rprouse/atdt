@@ -61,12 +61,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    # Real philes for manual testing (git-ignored apart from its README).
-    - assets/dev/
-    # Stage A spike only: the reader falls back to the synthetic fixtures
-    # when assets/dev/ has no philes. Remove once Stage D feeds the reader
-    # from storage.
-    - test/fixtures/
     # Font licences, shown in the About dialog's licence page.
     - assets/fonts/jetbrains_mono/OFL.txt
     - assets/fonts/bigblue_terminal/LICENSE.TXT

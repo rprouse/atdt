@@ -192,3 +192,19 @@ ferent`).
   - Each issue is saved in one transaction. A persisted `archive.download` flag ("requested" or "settled") drives the auto-resume at launch.
   - The database is `<application support>/atdt/archive.sqlite`. Android excludes `files/atdt/` with `fullBackupContent` (API ≤ 30) and `dataExtractionRules` (API 31+, cloud backup and device transfer). iOS sets `isExcludedFromBackup` on the folder through a method channel in `AppDelegate`. **Not yet built or verified on iOS: needs a Mac.**
   - Reading positions share the database, so they are excluded from backup too. They are per-device state, and the archive can be fetched again; a separate backed-up store can be added in Stage G if wanted.
+
+## 2026-10-16: Library navigation (Stage D)
+
+- **Checked:** the navigation flow, the first-launch flow and back-navigation on the emulator against the real archive. Also an upgrade from the Stage C build (schema v1, 18 issues downloaded) to this build.
+- **Found:**
+  - **drift reads `DateTime` back in local time.** Release dates are stored as UTC midnight, so 1999-09-09 came back as 1999-09-08 18:00 west of Greenwich, and the library would have shown every issue a day early. On the `America/Denver` emulator, all displayed dates now match phrack.org's picker exactly (e.g. Issue 18, 6 Jul 1988).
+  - **`flutter test integration_test/...` uninstalls the app when it finishes on Android,** taking its data with it. Upgrade and real-archive checks must install builds with `adb install -r`, not run integration tests in between.
+  - **The v1→v2 upgrade works on a real device database:** the 18 issues, their dates and phile counts all survived, and the app opened into the library. A v1 database has no catalog, so undownloaded issues appear only after the next "Check for new issues". A fresh install records the catalog on its first check.
+  - Decoding the 16 MB phile (71/7) on the UI isolate would freeze the app. Real isolates also never finish under the widget tester's fake clock.
+- **Changed:**
+  - **The issues list is home, and the first-launch flow is its empty state.** It explains the download (about 31 MB, from archives.phrack.org, resumable) and starts it only on confirmation. While downloading, a progress banner shows and issues appear as they are stored. Launch → issue → phile is **two taps**.
+  - **Schema v2** adds a `catalog` table (issue and release date), written by the downloader on every check, before it downloads anything. Undownloaded issues are listed, dimmed, with a cloud icon, even offline. Release dates are read back in UTC and formatted from UTC fields.
+  - `readAllLines` decodes on a short-lived isolate above 256 KB. Widget-test databases raise that threshold; the storage unit tests cover the isolate path in real time.
+  - The issue screen stays mounted under the reader, so back returns to the same scroll position. A widget test covers it.
+  - **The app no longer bundles any text.** The fixture and `assets/dev/` asset declarations are gone, along with `tool/fetch_dev_philes.dart`. Any build made on a machine with dev philes would otherwise have shipped Phrack text inside the app, against a spec non-goal. Real philes come from the in-app download. Device tests generate their 10,000-line text in code.
+  - The settings screen stub carries over the spike's font, theme and orientation menus, plus the debug overlay and About/licences. The reader chrome keeps quick font, theme and orientation menus and gains a back button. Settings are not persisted yet (Stage G).

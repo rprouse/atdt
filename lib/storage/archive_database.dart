@@ -5,6 +5,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
@@ -163,12 +164,20 @@ class LibraryIssue {
   ],
 )
 class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
-  ArchiveDatabase(super.executor, {this.chunkBytes = defaultChunkBytes});
+  ArchiveDatabase(
+    super.executor, {
+    this.chunkBytes = defaultChunkBytes,
+    this.decodeOnIsolateAbove = 256 * 1024,
+  });
 
   static const int defaultChunkBytes = 16 * 1024;
 
   /// Target size of a text chunk; small values let tests force many chunks.
   final int chunkBytes;
+
+  /// Philes larger than this are decoded on a short-lived isolate. Widget
+  /// tests raise it, because real isolates never finish under fake time.
+  final int decodeOnIsolateAbove;
 
   @override
   int get schemaVersion => 2;
@@ -281,9 +290,9 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
               number: r.read<int>('number'),
               downloaded: r.read<bool>('downloaded'),
               // drift reads DateTime back in local time; release dates are
-          // calendar dates stored at UTC midnight, so keep them in UTC or
-          // they show as the previous day west of Greenwich.
-          releaseDate: r.readNullable<DateTime>('release_date')?.toUtc(),
+              // calendar dates stored at UTC midnight, so keep them in UTC or
+              // they show as the previous day west of Greenwich.
+              releaseDate: r.readNullable<DateTime>('release_date')?.toUtc(),
               phileCount: r.read<int>('phile_count'),
             ),
         ],
@@ -332,18 +341,26 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
   }
 
   /// Every line of a phile, for the reader.
+  ///
+  /// Large philes are decoded on a short-lived isolate: 71/7 is 16 MB and
+  /// would freeze the UI for its whole decode.
   Future<List<String>> readAllLines(int phileId) async {
     final chunks =
         await (select(phileTextChunks)
               ..where((c) => c.phileId.equals(phileId))
               ..orderBy([(c) => OrderingTerm.asc(c.chunk)]))
             .get();
-    return [
-      for (final c in chunks)
-        ...const LineSplitter().convert(utf8.decode(c.data)),
-    ];
+    final data = [for (final c in chunks) c.data];
+    final bytes = data.fold(0, (n, d) => n + d.length);
+    return bytes > decodeOnIsolateAbove
+        ? Isolate.run(() => _decodeChunks(data))
+        : _decodeChunks(data);
   }
 }
+
+List<String> _decodeChunks(List<Uint8List> chunks) => [
+  for (final c in chunks) ...const LineSplitter().convert(utf8.decode(c)),
+];
 
 typedef TextChunk = ({int firstLine, int lineCount, Uint8List data});
 
