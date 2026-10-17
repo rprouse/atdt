@@ -10,6 +10,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../helpers/archive_harness.dart';
+
 import '../helpers/reader_harness.dart';
 
 final _firstLine = find.textContaining(RegExp('^00000 '));
@@ -61,6 +63,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          ...archiveOverrides(),
           currentDocumentPathProvider.overrideWith(
             (ref) async => 'test/fixtures/ten_thousand_lines.txt',
           ),

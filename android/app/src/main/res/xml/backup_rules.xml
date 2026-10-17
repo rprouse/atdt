@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and lower. The downloaded archive (files/atdt/) can be
+     fetched again, so it is not backed up. -->
+<full-backup-content>
+    <exclude domain="file" path="atdt/" />
+</full-backup-content>
