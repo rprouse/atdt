@@ -61,7 +61,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
-    final theme = settings.theme;
+    final theme = ref.watch(currentThemeProvider);
     final font = ref.watch(currentFontProvider);
     final phile = ref.watch(storedPhileProvider(widget.phileId));
     final title = phile.value?.meta.title ?? widget.title ?? '';
@@ -193,8 +193,11 @@ class _TopBar extends ConsumerWidget {
               _Menu<String>(
                 tooltip: 'Theme',
                 icon: Icons.palette_outlined,
-                selected: settings.themeId,
-                items: {for (final t in readerThemes) t.id: t.displayName},
+                selected: theme.id,
+                items: {
+                  for (final t in ref.watch(allThemesProvider))
+                    t.id: t.displayName,
+                },
                 onSelected: notifier.setTheme,
               ),
               _Menu<OrientationMode>(

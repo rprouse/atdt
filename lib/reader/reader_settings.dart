@@ -25,18 +25,18 @@ enum OrientationMode {
 class ReaderSettings {
   const ReaderSettings({
     this.fontId,
-    this.themeId = 'green_phosphor',
+    this.themeId,
     this.orientation = OrientationMode.auto,
     this.showDebugOverlay = false,
   });
 
   /// Null means the manifest's default font.
   final String? fontId;
-  final String themeId;
+
+  /// Null means the first built-in theme.
+  final String? themeId;
   final OrientationMode orientation;
   final bool showDebugOverlay;
-
-  ReaderTheme get theme => readerThemeById(themeId);
 
   ReaderSettings copyWith({
     String? fontId,
@@ -51,45 +51,55 @@ class ReaderSettings {
   );
 }
 
-/// Key of the persisted font choice in the database's settings table.
+/// Keys of persisted choices in the database's settings table.
 const fontSettingKey = 'reader.font';
+const themeSettingKey = 'reader.theme';
+const customThemesSettingKey = 'themes.custom';
+
+Future<void> _save(Ref ref, String key, String value) => ref
+    .read(archiveDatabaseProvider)
+    .setSetting(key, value)
+    .catchError((Object e) {
+      developer.log('could not save $key: $e', name: 'atdt.settings');
+    });
 
 class ReaderSettingsNotifier extends Notifier<ReaderSettings> {
+  /// Completes once saved choices are loaded. `main` waits for it so the
+  /// first frame already has the right theme.
+  late Future<void> restored;
+
   @override
   ReaderSettings build() {
-    unawaited(_restoreFont());
+    restored = _restore();
     return const ReaderSettings();
   }
 
-  /// The font choice persists across launches (Stage E); theme and
-  /// orientation follow in Stages F and G.
-  Future<void> _restoreFont() async {
+  /// Font (Stage E) and theme (Stage F) persist across launches;
+  /// orientation follows in Stage G.
+  Future<void> _restore() async {
     try {
-      final id = await ref
-          .read(archiveDatabaseProvider)
-          .setting(fontSettingKey);
+      final db = ref.read(archiveDatabaseProvider);
+      final font = await db.setting(fontSettingKey);
+      final theme = await db.setting(themeSettingKey);
       // A choice made while restoring wins.
-      if (id != null && state.fontId == null) {
-        state = state.copyWith(fontId: id);
-      }
+      state = state.copyWith(
+        fontId: state.fontId == null ? font : null,
+        themeId: state.themeId == null ? theme : null,
+      );
     } on Object catch (e) {
-      developer.log('could not restore font: $e', name: 'atdt.settings');
+      developer.log('could not restore settings: $e', name: 'atdt.settings');
     }
   }
 
   void setFont(String id) {
     state = state.copyWith(fontId: id);
-    unawaited(
-      ref
-          .read(archiveDatabaseProvider)
-          .setSetting(fontSettingKey, id)
-          .catchError((Object e) {
-            developer.log('could not save font: $e', name: 'atdt.settings');
-          }),
-    );
+    unawaited(_save(ref, fontSettingKey, id));
   }
 
-  void setTheme(String id) => state = state.copyWith(themeId: id);
+  void setTheme(String id) {
+    state = state.copyWith(themeId: id);
+    unawaited(_save(ref, themeSettingKey, id));
+  }
 
   void toggleDebugOverlay() =>
       state = state.copyWith(showDebugOverlay: !state.showDebugOverlay);
@@ -113,3 +123,80 @@ final currentFontProvider = Provider<ReaderFont>((ref) {
   final id = ref.watch(readerSettingsProvider.select((s) => s.fontId));
   return id == null ? registry.defaultFont : registry.byId(id);
 });
+
+/// The reader's own themes, saved in the settings table.
+class CustomThemesNotifier extends Notifier<List<ReaderTheme>> {
+  /// Completes once saved themes are loaded.
+  late Future<void> loaded;
+
+  @override
+  List<ReaderTheme> build() {
+    loaded = _load();
+    return const [];
+  }
+
+  Future<void> _load() async {
+    try {
+      final json = await ref
+          .read(archiveDatabaseProvider)
+          .setting(customThemesSettingKey);
+      if (json != null) state = decodeThemes(json);
+    } on Object catch (e) {
+      developer.log('could not load themes: $e', name: 'atdt.settings');
+    }
+  }
+
+  /// Adds [theme], or replaces the custom theme with the same id.
+  void save(ReaderTheme theme) {
+    final index = state.indexWhere((t) => t.id == theme.id);
+    state = index < 0
+        ? [...state, theme]
+        : [...state.take(index), theme, ...state.skip(index + 1)];
+    unawaited(_save(ref, customThemesSettingKey, encodeThemes(state)));
+  }
+
+  void delete(String id) {
+    state = [
+      for (final t in state)
+        if (t.id != id) t,
+    ];
+    unawaited(_save(ref, customThemesSettingKey, encodeThemes(state)));
+  }
+}
+
+final customThemesProvider =
+    NotifierProvider<CustomThemesNotifier, List<ReaderTheme>>(
+      CustomThemesNotifier.new,
+    );
+
+/// Built-in themes first, then the reader's own.
+final allThemesProvider = Provider<List<ReaderTheme>>(
+  (ref) => [...builtInThemes, ...ref.watch(customThemesProvider)],
+);
+
+/// The theme in use: the chosen one, or the first built-in if nothing is
+/// chosen or the chosen custom theme was deleted.
+final currentThemeProvider = Provider<ReaderTheme>((ref) {
+  final id = ref.watch(readerSettingsProvider.select((s) => s.themeId));
+  final themes = ref.watch(allThemesProvider);
+  return themes.firstWhere(
+    (t) => t.id == id,
+    orElse: () => builtInThemes.first,
+  );
+});
+
+/// Waits (briefly) for saved settings and themes, so the first frame is
+/// already in the reader's theme. Never blocks startup on storage errors.
+Future<void> restoreSavedSettings(ProviderContainer container) async {
+  try {
+    await Future.wait([
+      container.read(readerSettingsProvider.notifier).restored,
+      container.read(customThemesProvider.notifier).loaded,
+    ]).timeout(const Duration(seconds: 2));
+  } on Object catch (e) {
+    developer.log(
+      'settings not restored before launch: $e',
+      name: 'atdt.settings',
+    );
+  }
+}

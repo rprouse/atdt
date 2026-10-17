@@ -1,6 +1,7 @@
 // Visual record of the reader at fixed viewport sizes. Linux only: see
 // tool/goldens/ for regenerating these on Windows or macOS via Docker.
 import 'package:atdt/reader/reader_font.dart';
+import 'package:atdt/reader/reader_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,10 +18,20 @@ void main() {
     required ReaderFont font,
     required Size size,
     required String name,
+    ReaderTheme? theme,
   }) async {
     setSurface(tester, size);
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(readerApp(text: fixture(fixtureName), font: font));
+    await tester.pumpWidget(
+      theme == null
+          ? readerApp(text: fixture(fixtureName), font: font)
+          : readerApp(
+              text: fixture(fixtureName),
+              font: font,
+              background: theme.background,
+              foreground: theme.foreground,
+            ),
+    );
     await expectLater(
       find.byType(MaterialApp),
       matchesGoldenFile('goldens/$name.png'),
@@ -50,6 +61,22 @@ void main() {
         font: fontById(id),
         size: _sizes['portrait']!,
         name: 'box_drawing_$id',
+      ),
+      skip: !goldensSupported,
+    );
+  }
+
+  // The reader in every built-in theme (spec Stage F acceptance).
+  for (final theme in builtInThemes) {
+    testWidgets(
+      'theme: ${theme.id}',
+      (tester) => expectGolden(
+        tester,
+        fixtureName: 'box_drawing.txt',
+        font: jetBrainsMono,
+        size: _sizes['portrait']!,
+        name: 'theme_${theme.id}',
+        theme: theme,
       ),
       skip: !goldensSupported,
     );
