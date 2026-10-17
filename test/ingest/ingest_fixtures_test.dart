@@ -116,6 +116,17 @@ void main() {
       expect(t.lines, ['---', 'This is a rule, not YAML', '---', 'Body text']);
     });
 
+    test('glyph_coverage.txt', () {
+      final t = _ingest('glyph_coverage.txt');
+      expect(t.lines, hasLength(6));
+      // Every line closes with a bar in column 12.
+      expect(
+        t.lines.every((l) => l.runes.length == 12 && l.endsWith('|')),
+        isTrue,
+      );
+      expect(t.inventory, containsAll('♥é╬⌠'.runes));
+    });
+
     test('ligatures.txt', () {
       expect(_ingest('ligatures.txt').lines.first, startsWith('-> != =='));
     });

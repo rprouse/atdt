@@ -126,6 +126,21 @@ void main() {
     0xC8, 0xCD, 0xCD, 0xBC, 0x0A,
   ]);
 
+  // Characters some bundled fonts lack (CP437 symbols, accents, box
+  // drawing), each line closed by a bar in column 12. With placeholder
+  // substitution every bar lines up whatever the font.
+  write(
+    'glyph_coverage.txt',
+    lf([
+      '0123456789A|',
+      '☺☻♥♦♣♠•◘○◙A|',
+      'éèêëàçñÅÆøA|',
+      '╔═╦═╗║╬╩╝▓A|',
+      '⌠⌡ⁿ₧ƒ¥£¢°±A|',
+      'plain asciA|',
+    ]),
+  );
+
   // Dashed rules that are not front matter must be kept.
   write(
     'not_front_matter.txt',

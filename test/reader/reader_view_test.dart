@@ -18,10 +18,9 @@ void main() {
     for (final size in [_portrait, _landscape]) {
       final orientation = size == _portrait ? 'portrait' : 'landscape';
 
-      for (final font in readerFonts) {
-        testWidgets('${font.id} fills the width in $orientation', (
-          tester,
-        ) async {
+      for (final id in manifestFontIds) {
+        testWidgets('$id fills the width in $orientation', (tester) async {
+          final font = fontById(id);
           setSurface(tester, size);
           addTearDown(tester.view.reset);
           final text = fixture('exact_80.txt');
@@ -49,6 +48,73 @@ void main() {
       expect(measureAdvanceRatio(jetBrainsMono), closeTo(0.6, 1e-4));
       expect(measureAdvanceRatio(bigBlueTerminal), closeTo(2 / 3, 1e-4));
       expect(measureAdvanceRatio(c64ProMono), closeTo(1, 1e-4));
+      expect(
+        measureAdvanceRatio(fontById('ibm_plex_mono')),
+        closeTo(0.6, 1e-4),
+      );
+      expect(measureAdvanceRatio(terminus), closeTo(0.5, 1e-4));
+    });
+  });
+
+  group('placeholder substitution', () {
+    for (final id in manifestFontIds) {
+      testWidgets('every column lines up despite missing glyphs ($id)', (
+        tester,
+      ) async {
+        setSurface(tester, _portrait);
+        addTearDown(tester.view.reset);
+        final font = fontById(id);
+        final key = GlobalKey<ReaderViewState>();
+        await tester.pumpWidget(
+          readerApp(text: fixture('glyph_coverage.txt'), font: font, key: key),
+        );
+        final layout = key.currentState!.layout!;
+
+        final paragraphs = tester.renderObjectList<RenderParagraph>(
+          find.descendant(
+            of: find.byType(ReaderView),
+            matching: find.byType(RichText),
+          ),
+        );
+        expect(paragraphs, hasLength(6));
+        for (final p in paragraphs) {
+          final text = p.text.toPlainText();
+          // Only glyphs of this font are drawn: missing ones were replaced.
+          expect(text.runes.every(font.coverage.covers), isTrue, reason: text);
+          // The closing bar (code unit 11) starts exactly 11 columns in.
+          final bar = p
+              .getBoxesForSelection(
+                const TextSelection(baseOffset: 11, extentOffset: 12),
+              )
+              .single;
+          expect(
+            p.localToGlobal(Offset(bar.left, 0)).dx,
+            closeTo(layout.textLeft + 11 * layout.glyphAdvance, 0.5),
+            reason: '$id: $text',
+          );
+        }
+      });
+    }
+
+    testWidgets('fully covered philes are drawn untouched', (tester) async {
+      setSurface(tester, _portrait);
+      addTearDown(tester.view.reset);
+      final text = fixture('glyph_coverage.txt');
+      expect(terminus.coverage.coversAll(text.inventory), isTrue);
+      await tester.pumpWidget(readerApp(text: text, font: terminus));
+      expect(find.text('☺☻♥♦♣♠•◘○◙A|'), findsOneWidget);
+    });
+
+    testWidgets('a missing glyph becomes the placeholder of the font', (
+      tester,
+    ) async {
+      setSurface(tester, _portrait);
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        readerApp(text: fixture('glyph_coverage.txt'), font: jetBrainsMono),
+      );
+      // JetBrains Mono lacks ☺☻♥♦♣♠◘◙ but has • and ○; its placeholder is ·.
+      expect(find.text('······•·○·A|'), findsOneWidget);
     });
   });
 
@@ -125,10 +191,9 @@ void main() {
       state.horizontalController!.jumpTo(columns * layout.glyphAdvance);
     }
 
-    for (final font in readerFonts) {
-      testWidgets('rotation keeps top line and column (${font.id})', (
-        tester,
-      ) async {
+    for (final id in manifestFontIds) {
+      testWidgets('rotation keeps top line and column ($id)', (tester) async {
+        final font = fontById(id);
         final key = await openLargeFile(tester, font);
         addTearDown(tester.view.reset);
         final state = key.currentState!;

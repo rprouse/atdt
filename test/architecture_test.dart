@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Directories that must stay pure Dart (AGENTS.md hard rule 3), so their
 /// logic can be unit-tested without a Flutter binding.
-const _pureDartDirs = ['lib/layout', 'lib/ingest', 'lib/archive'];
+const _pureDartDirs = ['lib/layout', 'lib/ingest', 'lib/archive', 'lib/fonts'];
 
 final _forbiddenImport = RegExp(
   r'''^\s*(import|export)\s+['"](package:flutter/|package:flutter_riverpod/|dart:ui)''',

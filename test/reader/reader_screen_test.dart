@@ -1,6 +1,7 @@
 import 'dart:ui' show DisplayFeature, DisplayFeatureState, DisplayFeatureType;
 
 import 'package:atdt/reader/reader_screen.dart';
+import 'package:atdt/reader/reader_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -129,5 +130,70 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_textGeometry(tester).$1.dx, closeTo(before.$1.dx + 30, 0.01));
+  });
+
+  group('coverage notice', () {
+    Future<ProviderContainer> openPhile(
+      WidgetTester tester,
+      String fixtureName,
+    ) async {
+      setSurface(tester, const Size(390, 844));
+      addTearDown(tester.view.reset);
+      final db = memoryArchiveDatabase();
+      addTearDown(db.close);
+      final id = await seedPhile(db, fixtureName);
+      final container = ProviderContainer(
+        overrides: archiveOverrides(database: db),
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(home: ReaderScreen(phileId: id)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return container;
+    }
+
+    final notice = find.byKey(const ValueKey('coverage-notice'));
+
+    testWidgets('offers a font that can draw every character', (tester) async {
+      final container = await openPhile(tester, 'glyph_coverage.txt');
+
+      // The default font lacks some; the first manifest font with all of
+      // them is offered.
+      expect(notice, findsOneWidget);
+      expect(
+        find.textContaining('JetBrains Mono has no glyph'),
+        findsOneWidget,
+      );
+      final offer = testFonts.firstCovering(
+        fixture('glyph_coverage.txt').inventory,
+      )!;
+      await tester.tap(find.text('Use ${offer.displayName}'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(currentFontProvider), offer);
+      expect(notice, findsNothing);
+      expect(find.text('☺☻♥♦♣♠•◘○◙A|'), findsOneWidget);
+    });
+
+    testWidgets('dismissing it leaves every line where it was', (tester) async {
+      await openPhile(tester, 'glyph_coverage.txt');
+      final line = find.text('0123456789A|');
+      final before = tester.getTopLeft(line);
+
+      await tester.tap(find.text('Dismiss'));
+      await tester.pumpAndSettle();
+
+      expect(notice, findsNothing);
+      expect(tester.getTopLeft(line), before);
+    });
+
+    testWidgets('is not shown when the font covers the phile', (tester) async {
+      await openPhile(tester, 'ten_thousand_lines.txt');
+      expect(notice, findsNothing);
+    });
   });
 }

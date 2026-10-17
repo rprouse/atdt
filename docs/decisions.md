@@ -208,3 +208,25 @@ ferent`).
   - The issue screen stays mounted under the reader, so back returns to the same scroll position. A widget test covers it.
   - **The app no longer bundles any text.** The fixture and `assets/dev/` asset declarations are gone, along with `tool/fetch_dev_philes.dart`. Any build made on a machine with dev philes would otherwise have shipped Phrack text inside the app, against a spec non-goal. Real philes come from the in-app download. Device tests generate their 10,000-line text in code.
   - The settings screen stub carries over the spike's font, theme and orientation menus, plus the debug overlay and About/licences. The reader chrome keeps quick font, theme and orientation menus and gains a back button. Settings are not persisted yet (Stage G).
+
+## 2026-10-16: Font system (Stage E)
+
+- **Checked:**
+  - Licences, from the primary sources, of three more candidates: IBM Plex Mono (google/fonts), VT323 (google/fonts) and Terminus TTF 4.49.3 (files.ax86.net). Their coverage was inspected with fontTools.
+  - Our `cmap` reader against fontTools' code-point counts.
+  - On the emulator: runtime font loading, the coverage notice, and the placeholders.
+- **Found:**
+  - **IBM Plex Mono:** OFL 1.1, Reserved Font Name "Plex". Full box drawing and Latin-1; missing 37 CP437 symbols; no ligature tables.
+  - **Terminus TTF 4.49.3:** OFL 1.1, Reserved Font Names "Terminus Font" and "Terminus (TTF)". Complete CP437 and Latin-1, the best coverage of any font we ship. Its 0.09 em line gap would open gaps in box-drawing verticals, so its `lineHeightRatio` is 1.0.
+  - **VT323:** OFL 1.1, but **no box-drawing characters at all** (0/128). Phrack has 1,899 of them, so every one would be a placeholder. Not shipped.
+  - Flutter has no API for a font's character set, but the app holds the font bytes. The pure-Dart `cmap` reader (formats 4 and 12) matches fontTools exactly on all five fonts (781–1,496 code points each).
+  - C64 Pro Mono draws U+2219 as a heavy disc, indistinguishable from real `●` content, so it is no good as a "missing" mark.
+  - Test gotcha: `rootBundle` caches load futures. One cached inside a widget test's fake-async zone never completes when awaited later under `runAsync`, which caused a 10-minute hang. Clear the bundle cache in such tests.
+- **Changed:**
+  - **Fonts: JetBrains Mono, IBM Plex Mono, BigBlue Terminal, Terminus and C64 Pro Mono,** spanning modern and retro.
+  - **`assets/fonts/manifest.json`** lists each font's id, display name, family, files, `integerScale`, cell sizes (pixel fonts only), `lineHeightRatio`, licence name, URL and file, and attribution. Font files and licences live in flat `files/` and `licences/` folders, each declared once in `pubspec.yaml`. The pubspec has **no `fonts:` section**: `FontRegistry` registers each family with `FontLoader` at startup. **Adding a font is a file plus a manifest entry.** Tests enforce this: no Dart file in `lib/` may name a font id or family, every manifest path must exist, and every file in the font folders must be used.
+  - **Coverage map:** each font's code points come from its own bytes at startup.
+  - **Placeholder substitution:** a character the active font lacks is drawn as that font's `·` (U+00B7), or `?` if it has none. It is one code point for one, so columns never move, and the system fallback font is never used. When the font covers the phile's stored inventory, lines are not touched at all. A widget test checks every font: on each line of a mixed-coverage fixture, the closing bar's glyph box starts exactly 11 columns in. Goldens show the same.
+  - **Coverage notice:** when the font cannot draw part of a phile, a dismissible card offers the first manifest font that can draw all of it. Verified on the emulator: C64 Pro Mono on 17/9 (its `¶`) offers JetBrains Mono. The card floats like the chrome and never moves text.
+  - **Credits screen** (Settings → Credits): every font with attribution, licence name and URL, and its full licence text. The About dialog and Flutter's licence page are fed from the same manifest.
+  - **The font choice persists** (`reader.font` in the settings table). A stored id that is no longer bundled falls back to the default.

@@ -29,6 +29,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   final _diagnostics = ValueNotifier<ReaderDiagnostics?>(null);
   bool _chromeVisible = true;
 
+  /// Fonts whose coverage notice was dismissed for this phile.
+  final _dismissedNotices = <String>{};
+
   @override
   void dispose() {
     _diagnostics.dispose();
@@ -59,6 +62,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
     final theme = settings.theme;
+    final font = ref.watch(currentFontProvider);
     final phile = ref.watch(storedPhileProvider(widget.phileId));
     final title = phile.value?.meta.title ?? widget.title ?? '';
 
@@ -69,7 +73,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         child: ReaderView(
           key: const ValueKey('reader'),
           text: value.text,
-          font: settings.font,
+          font: font,
           foreground: theme.foreground,
           onVerticalUserScroll: _onVerticalUserScroll,
           diagnostics: _diagnostics,
@@ -103,13 +107,41 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               ),
             ),
           ),
+          if (phile case AsyncData(:final value)
+              when !_dismissedNotices.contains(font.id) &&
+                  !font.coverage.coversAll(value.text.inventory))
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: SafeArea(
+                top: false,
+                child: _CoverageNotice(
+                  font: font,
+                  missing: font.coverage.missing(value.text.inventory).length,
+                  alternative: ref
+                      .read(fontRegistryProvider)
+                      .firstCovering(value.text.inventory),
+                  theme: theme,
+                  onDismiss: () =>
+                      setState(() => _dismissedNotices.add(font.id)),
+                ),
+              ),
+            ),
           if (settings.showDebugOverlay)
             Positioned(
               left: 8,
               bottom: 8,
               child: IgnorePointer(
                 child: SafeArea(
-                  child: DebugOverlay(diagnostics: _diagnostics, theme: theme),
+                  child: DebugOverlay(
+                    diagnostics: _diagnostics,
+                    theme: theme,
+                    fontFamily: ref
+                        .read(fontRegistryProvider)
+                        .defaultFont
+                        .family,
+                  ),
                 ),
               ),
             ),
@@ -129,6 +161,8 @@ class _TopBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(readerSettingsProvider);
     final notifier = ref.read(readerSettingsProvider.notifier);
+    final registry = ref.watch(fontRegistryProvider);
+    final font = ref.watch(currentFontProvider);
 
     return Material(
       key: const ValueKey('chrome'),
@@ -152,8 +186,8 @@ class _TopBar extends ConsumerWidget {
               _Menu<String>(
                 tooltip: 'Font',
                 icon: Icons.text_fields,
-                selected: settings.fontId,
-                items: {for (final f in readerFonts) f.id: f.displayName},
+                selected: font.id,
+                items: {for (final f in registry.fonts) f.id: f.displayName},
                 onSelected: notifier.setFont,
               ),
               _Menu<String>(
@@ -217,4 +251,71 @@ class _Menu<T> extends StatelessWidget {
         ),
     ],
   );
+}
+
+/// Offered when the phile uses characters the current font cannot draw.
+/// Floats over the text like the chrome, so it never moves a line.
+class _CoverageNotice extends ConsumerWidget {
+  const _CoverageNotice({
+    required this.font,
+    required this.missing,
+    required this.alternative,
+    required this.theme,
+    required this.onDismiss,
+  });
+
+  final ReaderFont font;
+  final int missing;
+  final ReaderFont? alternative;
+  final ReaderTheme theme;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final placeholder = String.fromCharCode(font.coverage.placeholder);
+    final what = missing == 1
+        ? '1 character in this phile; it shows'
+        : '$missing characters in this phile; they show';
+    return Material(
+      key: const ValueKey('coverage-notice'),
+      color: theme.background,
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: theme.dim),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${font.displayName} has no glyph for $what as $placeholder.',
+              style: TextStyle(color: theme.foreground),
+            ),
+            // Wraps rather than overflowing with long font names or large
+            // system text.
+            Wrap(
+              alignment: WrapAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: onDismiss,
+                  style: TextButton.styleFrom(foregroundColor: theme.dim),
+                  child: const Text('Dismiss'),
+                ),
+                if (alternative != null)
+                  TextButton(
+                    onPressed: () => ref
+                        .read(readerSettingsProvider.notifier)
+                        .setFont(alternative!.id),
+                    style: TextButton.styleFrom(foregroundColor: theme.accent),
+                    child: Text('Use ${alternative!.displayName}'),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

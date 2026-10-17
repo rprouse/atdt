@@ -25,8 +25,8 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 | A | Rendering spike | Done; device checks pending ([report](docs/spike-report.md)) |
 | B | Ingestion and normalisation | Done |
 | C | Archive download and storage | Done; profile-mode perf check pending |
-| D | Library navigation | In review |
-| E | Font system | Not started |
+| D | Library navigation | Done |
+| E | Font system | In review |
 | F | Themes | Not started |
 | G | Reader polish | Not started |
 | H | Search | Not started |
@@ -51,7 +51,7 @@ flutter run
 
 The app opens on the list of Phrack issues. On first launch it explains the one-time download (about 31 MB from archives.phrack.org) and starts it when you confirm; issues appear as they arrive, and an interrupted download resumes. Tap an issue for its philes, and a phile to read it.
 
-In the reader, tap the text to show or hide the chrome. The chrome switches font (JetBrains Mono, BigBlue Terminal or C64 Pro Mono), theme and orientation (Auto, Portrait, Landscape), and the bug icon shows a layout debug overlay. The settings screen (gear icon on the issues list) has the same choices plus About, with font credits and licences. The cloud icon checks for new issues.
+In the reader, tap the text to show or hide the chrome. The chrome switches font (JetBrains Mono, IBM Plex Mono, BigBlue Terminal, Terminus or C64 Pro Mono), theme and orientation (Auto, Portrait, Landscape), and the bug icon shows a layout debug overlay. The settings screen (gear icon on the issues list) has the same choices, which are remembered, plus Credits with every font's licence. Characters a font cannot draw show as its `·` (or `?`) so columns never shift, and the reader offers a font that has them all. The cloud icon checks for new issues.
 
 Phrack text is never committed to this repository or bundled in the app: the app downloads it on the device.
 
@@ -71,6 +71,10 @@ dart run tool/ingest_archive.dart          # all issues; or: ... 1 10
 ```
 
 Issue tarballs are downloaded once (1 s apart) into the git-ignored `tool/out/archive/`; the report is `tool/out/ingest_report.csv`.
+
+### Adding a font
+
+Put the font file in `assets/fonts/files/` and its licence text in `assets/fonts/licences/`, then add an entry to `assets/fonts/manifest.json`. No code or pubspec changes are needed; `test/fonts/font_manifest_test.dart` checks the entry, the files and the licence.
 
 ### Storage
 
@@ -119,6 +123,7 @@ Timeline summaries are written to `build/scroll_perf_<font>.timeline_summary.jso
 lib/
   layout/      Pure Dart layout maths (no Flutter imports)
   ingest/      Pure Dart decoding and normalisation (no Flutter imports)
+  fonts/       Pure Dart font manifest and cmap coverage (no Flutter imports)
   archive/     Pure Dart archive parsing and downloading (no Flutter imports)
   storage/     drift database: issues, philes, text chunks, catalog, settings
   download/    Download controller and archive screen
@@ -126,7 +131,7 @@ lib/
   reader/      The reader widget, its scroll structure, chrome and debug overlay
   settings/    Settings screen
 assets/
-  fonts/       Bundled fonts with their licences and attribution
+  fonts/       manifest.json, files/ (fonts) and licences/ (their licence texts)
 test/
   fixtures/    Synthetic, byte-exact text fixtures
   archive/fixtures/   Synthetic issue tarball
@@ -149,6 +154,6 @@ docs/          Spec, decisions log, spike report
 
 The source code is released under the [MIT License](LICENSE).
 
-Bundled fonts keep their own licences: JetBrains Mono (SIL OFL 1.1), BigBlue TerminalPlus by VileR (CC BY-SA 4.0) and C64 Pro Mono by Style (freeware, only for software that is free to end users). They are credited in the app's About dialog and alongside each font in `assets/fonts/`.
+Bundled fonts keep their own licences: JetBrains Mono, IBM Plex Mono and Terminus (SIL OFL 1.1), BigBlue TerminalPlus by VileR (CC BY-SA 4.0), and C64 Pro Mono by Style (freeware, only for software that is free to end users). `assets/fonts/manifest.json` records each font's attribution and licence; the licence texts are in `assets/fonts/licences/` and in the app's Credits screen.
 
 Phrack and all Phrack content belong to their respective authors and the Phrack staff. This project is not affiliated with Phrack.

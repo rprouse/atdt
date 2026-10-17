@@ -116,6 +116,13 @@ class ReaderViewState extends State<ReaderView> {
         );
         _ensureControllers(layout, constraints, advanceRatio);
 
+        // Characters the font lacks are drawn as its own placeholder glyph,
+        // never via system fallback, whose different width would shift
+        // every column after it. Checked once against the phile's
+        // inventory, so fully covered philes skip it entirely.
+        final coverage = widget.font.coverage;
+        final substitute = !coverage.coversAll(widget.text.inventory);
+
         // At fit the content is exactly the viewport; overflow columns add
         // their width on the right.
         final contentWidth =
@@ -145,8 +152,12 @@ class ReaderViewState extends State<ReaderView> {
                   padding: EdgeInsets.zero,
                   itemExtent: layout.lineHeight,
                   itemCount: widget.text.lines.length,
-                  itemBuilder: (context, index) =>
-                      _line(widget.text.lines[index], layout),
+                  itemBuilder: (context, index) => _line(
+                    substitute
+                        ? coverage.substitute(widget.text.lines[index])
+                        : widget.text.lines[index],
+                    layout,
+                  ),
                 ),
               ),
             ),

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:atdt/fonts/font_manifest.dart';
 import 'package:atdt/ingest/phile_text.dart';
 import 'package:atdt/reader/reader_font.dart';
 import 'package:atdt/reader/reader_view.dart';
@@ -9,34 +10,47 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// Strict lookups: readerFontById falls back silently, which would hide a
-// renamed font in tests.
-ReaderFont _font(String id) => readerFonts.singleWhere((f) => f.id == id);
-final jetBrainsMono = _font('jetbrains_mono');
-final bigBlueTerminal = _font('bigblue_terminal_plus');
-final c64ProMono = _font('c64_pro_mono');
+FontRegistry? _testFonts;
+
+/// The real fonts from assets/fonts/manifest.json, registered with the test
+/// engine (which otherwise draws every glyph with a placeholder font).
+/// Call [loadReaderFonts] in `setUpAll` first.
+FontRegistry get testFonts =>
+    _testFonts ?? (throw StateError('call loadReaderFonts() in setUpAll'));
+
+bool get testFontsLoaded => _testFonts != null;
+
+Future<void> loadReaderFonts() async {
+  _testFonts ??= await FontRegistry.load(
+    loadString: (path) async => File(path).readAsStringSync(),
+    loadBytes: (path) async =>
+        ByteData.sublistView(File(path).readAsBytesSync()),
+  );
+  resetAdvanceRatioCache();
+}
+
+/// Font ids in manifest order, readable while tests are being declared
+/// (before setUpAll has loaded the fonts).
+final List<String> manifestFontIds = [
+  for (final f in FontManifest.parse(
+    File('assets/fonts/manifest.json').readAsStringSync(),
+  ).fonts)
+    f.id,
+];
+
+// Strict lookups: FontRegistry.byId falls back silently to the default,
+// which would hide a renamed font in tests.
+ReaderFont fontById(String id) =>
+    testFonts.fonts.singleWhere((f) => f.id == id);
+ReaderFont get jetBrainsMono => fontById('jetbrains_mono');
+ReaderFont get bigBlueTerminal => fontById('bigblue_terminal_plus');
+ReaderFont get c64ProMono => fontById('c64_pro_mono');
+ReaderFont get terminus => fontById('terminus');
 
 /// Goldens are rendered and compared on Linux only (CI, or the Docker
 /// script in tool/goldens/), because text rasterisation differs by OS.
 final bool goldensSupported = Platform.isLinux;
 const goldenSkipReason = 'Goldens run on Linux only: see tool/goldens/';
-
-/// flutter_test renders with a placeholder font unless real ones are loaded.
-Future<void> loadReaderFonts() async {
-  const files = {
-    'JetBrainsMono': 'assets/fonts/jetbrains_mono/JetBrainsMono-Regular.ttf',
-    'BigBlueTerminalPlus':
-        'assets/fonts/bigblue_terminal/BigBlue_TerminalPlus.TTF',
-    'C64ProMono': 'assets/fonts/c64_pro_mono/C64_Pro_Mono-STYLE.ttf',
-  };
-  for (final MapEntry(key: family, value: path) in files.entries) {
-    final bytes = File(path).readAsBytesSync();
-    await (FontLoader(
-      family,
-    )..addFont(Future.value(ByteData.sublistView(bytes)))).load();
-  }
-  resetAdvanceRatioCache();
-}
 
 PhileText fixture(String name) =>
     PhileText.fromBytes(File('test/fixtures/$name').readAsBytesSync());

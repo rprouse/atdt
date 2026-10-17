@@ -27,29 +27,45 @@ void main() {
     );
   }
 
-  for (final font in readerFonts) {
+  for (final id in manifestFontIds) {
     for (final MapEntry(key: orientation, value: size) in _sizes.entries) {
       testWidgets(
-        '80 columns at fit: ${font.id} $orientation',
+        '80 columns at fit: $id $orientation',
         (tester) => expectGolden(
           tester,
           fixtureName: 'exact_80.txt',
-          font: font,
+          font: fontById(id),
           size: size,
-          name: 'exact_80_${font.id}_$orientation',
+          name: 'exact_80_${id}_$orientation',
         ),
         skip: !goldensSupported,
       );
     }
 
     testWidgets(
-      'box drawing: ${font.id}',
+      'box drawing: $id',
       (tester) => expectGolden(
         tester,
         fixtureName: 'box_drawing.txt',
-        font: font,
+        font: fontById(id),
         size: _sizes['portrait']!,
-        name: 'box_drawing_${font.id}',
+        name: 'box_drawing_$id',
+      ),
+      skip: !goldensSupported,
+    );
+  }
+
+  // Characters a font lacks become its own placeholder, so the closing bar
+  // on every line stays in the same column (spec Stage E acceptance).
+  for (final id in manifestFontIds) {
+    testWidgets(
+      'missing glyphs keep columns aligned: $id',
+      (tester) => expectGolden(
+        tester,
+        fixtureName: 'glyph_coverage.txt',
+        font: fontById(id),
+        size: _sizes['portrait']!,
+        name: 'placeholders_$id',
       ),
       skip: !goldensSupported,
     );
