@@ -230,3 +230,18 @@ ferent`).
   - **Coverage notice:** when the font cannot draw part of a phile, a dismissible card offers the first manifest font that can draw all of it. Verified on the emulator: C64 Pro Mono on 17/9 (its `¶`) offers JetBrains Mono. The card floats like the chrome and never moves text.
   - **Credits screen** (Settings → Credits): every font with attribution, licence name and URL, and its full licence text. The About dialog and Flutter's licence page are fed from the same manifest.
   - **The font choice persists** (`reader.font` in the settings table). A stored id that is no longer bundled falls back to the default.
+
+## 2026-10-16: Themes (Stage F)
+
+- **Checked:** the WCAG contrast of the Stage A themes, and of candidate palettes for the new built-ins. On the emulator: the editor, live preview and whole-app theming.
+- **Found:**
+  - The Stage A themes' *dim* colours failed AA: green 3.52:1 and paper 3.19:1.
+  - Restoring the saved theme asynchronously would flash the default theme for a frame at every launch, because the theme colours the whole app.
+  - The editor's preview drew glyphs the reader font lacks with the system font, against AGENTS.md rule 9.
+- **Changed:**
+  - **Product decision (owner, 2026-10-16): no contrast warning for custom themes.** Themes are personal, not shared, so the spec's "warn below WCAG AA" is dropped. Instead, **every built-in theme meets AA (4.5:1)** for text, accent and dim against the background, and for text against the selection colour. High contrast reaches AAA. `test/themes/built_in_themes_test.dart` enforces this.
+  - A theme has five colours: background, foreground, selection, accent and dim. Brightness is derived from the background's luminance. **Built-ins:** green phosphor, amber phosphor, paper, high contrast and VGA blue (an IBM DOS-style blue, which suits the retro fonts). Dim colours were corrected to pass AA.
+  - **The theme drives the whole app:** the `ThemeData` maps accent to app bars, icons and buttons, foreground and dim to list text, and selection to text selection. A widget test checks that the app bar takes the theme's colours.
+  - **Custom themes:** create (starting from the current theme), edit and delete in Settings. The editor has an HSV + hex colour picker and a live preview of all five colours, in the reader font with placeholder substitution. Built-ins can't be edited. Custom themes are JSON in the settings table (`themes.custom`), and malformed entries are skipped. The choice is saved as `reader.theme`; deleting the theme in use falls back to the default.
+  - `main` waits (up to 2 s) for saved settings and themes before the first frame, so there is no flash. A storage error never blocks startup.
+  - Goldens: the reader in each built-in theme (`theme_<id>.png`).
