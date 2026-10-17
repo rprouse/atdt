@@ -67,7 +67,7 @@ void main() {
 
     final settings = container.read(readerSettingsProvider);
     expect(container.read(currentFontProvider).id, 'c64_pro_mono');
-    expect(settings.themeId, 'paper');
+    expect(container.read(currentThemeProvider).id, 'paper');
     expect(settings.orientation, OrientationMode.landscape);
     expect(orientations.single, [
       'DeviceOrientation.landscapeLeft',

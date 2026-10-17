@@ -38,7 +38,7 @@ class _AtdtAppState extends ConsumerState<AtdtApp> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ref.watch(readerSettingsProvider.select((s) => s.theme));
+    final theme = ref.watch(currentThemeProvider);
     return MaterialApp(
       title: 'ATDT',
       debugShowCheckedModeBanner: false,

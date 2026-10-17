@@ -26,8 +26,8 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 | B | Ingestion and normalisation | Done |
 | C | Archive download and storage | Done; profile-mode perf check pending |
 | D | Library navigation | Done |
-| E | Font system | In review |
-| F | Themes | Not started |
+| E | Font system | Done |
+| F | Themes | In review |
 | G | Reader polish | Not started |
 | H | Search | Not started |
 | I | Section navigation | Not started |
@@ -51,7 +51,7 @@ flutter run
 
 The app opens on the list of Phrack issues. On first launch it explains the one-time download (about 31 MB from archives.phrack.org) and starts it when you confirm; issues appear as they arrive, and an interrupted download resumes. Tap an issue for its philes, and a phile to read it.
 
-In the reader, tap the text to show or hide the chrome. The chrome switches font (JetBrains Mono, IBM Plex Mono, BigBlue Terminal, Terminus or C64 Pro Mono), theme and orientation (Auto, Portrait, Landscape), and the bug icon shows a layout debug overlay. The settings screen (gear icon on the issues list) has the same choices, which are remembered, plus Credits with every font's licence. Characters a font cannot draw show as its `·` (or `?`) so columns never shift, and the reader offers a font that has them all. The cloud icon checks for new issues.
+In the reader, tap the text to show or hide the chrome. The chrome switches font (JetBrains Mono, IBM Plex Mono, BigBlue Terminal, Terminus or C64 Pro Mono), theme and orientation (Auto, Portrait, Landscape), and the bug icon shows a layout debug overlay. The settings screen (gear icon on the issues list) has the same choices, which are remembered, five built-in themes (green and amber phosphor, paper, high contrast, VGA blue) plus your own themes made with a colour picker, plus Credits with every font's licence. Characters a font cannot draw show as its `·` (or `?`) so columns never shift, and the reader offers a font that has them all. The cloud icon checks for new issues.
 
 Phrack text is never committed to this repository or bundled in the app: the app downloads it on the device.
 

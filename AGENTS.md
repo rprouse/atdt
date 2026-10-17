@@ -17,6 +17,7 @@ ATDT is a Flutter (Dart) app for iOS and Android that reads the Phrack archive a
 7. **Do not assume glyph advance.** Measure each font's `advanceRatio` with `TextPainter`; never hardcode 0.6.
 8. **Pixel fonts render at integer scales** of their native cell size, with line heights on whole physical pixels.
 9. **Fonts come from `assets/fonts/manifest.json`.** Never name a font id or family in `lib/` (a test enforces it), and never let a missing glyph fall back to a system font: the reader substitutes the font's own placeholder.
+10. **Built-in themes meet WCAG AA** (a test enforces it). Custom themes are personal and are never contrast-checked or warned about (owner decision, see docs/decisions.md).
 
 ## Staged workflow
 

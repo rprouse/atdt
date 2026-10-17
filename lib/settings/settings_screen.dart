@@ -6,6 +6,7 @@ import '../reader/reader_font.dart';
 import '../reader/reader_settings.dart';
 import '../reader/reader_theme.dart';
 import 'credits_screen.dart';
+import 'theme_editor_screen.dart';
 
 /// Reader preferences. Stage E/F/G grow this; for now it carries over the
 /// spike's font, theme and orientation menus. Not yet persisted (Stage G).
@@ -18,6 +19,7 @@ class SettingsScreen extends ConsumerWidget {
     final notifier = ref.read(readerSettingsProvider.notifier);
     final registry = ref.watch(fontRegistryProvider);
     final currentFont = ref.watch(currentFontProvider);
+    final currentTheme = ref.watch(currentThemeProvider);
     final heading = Theme.of(context).textTheme.titleSmall
         ?.copyWith(color: Theme.of(context).colorScheme.primary);
 
@@ -54,22 +56,43 @@ class SettingsScreen extends ConsumerWidget {
           ),
           section('Theme'),
           RadioGroup<String>(
-            groupValue: settings.themeId,
+            groupValue: currentTheme.id,
             onChanged: (id) => id == null ? null : notifier.setTheme(id),
             child: Column(
               children: [
-                for (final theme in readerThemes)
+                for (final theme in ref.watch(allThemesProvider))
                   RadioListTile<String>(
                     key: ValueKey('theme-${theme.id}'),
                     value: theme.id,
                     title: Text(theme.displayName),
-                    secondary: _Swatch(
-                      theme: theme,
-                      family: registry.defaultFont.family,
+                    subtitle: theme.builtIn ? null : const Text('Custom'),
+                    secondary: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _Swatch(
+                          theme: theme,
+                          family: registry.defaultFont.family,
+                        ),
+                        if (!theme.builtIn)
+                          IconButton(
+                            key: ValueKey('edit-${theme.id}'),
+                            tooltip: 'Edit ${theme.displayName}',
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () =>
+                                _openEditor(context, theme, editing: true),
+                          ),
+                      ],
                     ),
                   ),
               ],
             ),
+          ),
+          ListTile(
+            key: const ValueKey('new-theme'),
+            leading: const Icon(Icons.add),
+            title: const Text('New theme'),
+            subtitle: Text('Starts from ${currentTheme.displayName}'),
+            onTap: () => _openEditor(context, currentTheme, editing: false),
           ),
           section('Orientation'),
           RadioGroup<OrientationMode>(
@@ -113,6 +136,16 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 }
+
+void _openEditor(
+  BuildContext context,
+  ReaderTheme theme, {
+  required bool editing,
+}) => Navigator.of(context).push(
+  MaterialPageRoute<void>(
+    builder: (_) => ThemeEditorScreen(base: theme, editing: editing),
+  ),
+);
 
 class _Swatch extends StatelessWidget {
   const _Swatch({required this.theme, required this.family});
