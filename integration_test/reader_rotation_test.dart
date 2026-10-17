@@ -1,13 +1,13 @@
 // Rotation and font changes on a real device, with real engine fonts.
 //
 //   flutter test integration_test/reader_rotation_test.dart -d <device>
-import 'package:atdt/ingest/phile_text.dart';
 import 'package:atdt/reader/reader_font.dart';
 import 'package:atdt/reader/reader_view.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+
+import 'fixture_text.dart';
 
 const _portrait = Size(390, 844);
 const _landscape = Size(844, 390);
@@ -15,11 +15,7 @@ const _landscape = Size(844, 390);
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  late PhileText text;
-  setUpAll(() async {
-    final data = await rootBundle.load('test/fixtures/ten_thousand_lines.txt');
-    text = PhileText.fromBytes(data.buffer.asUint8List());
-  });
+  final text = tenThousandLines();
 
   Future<GlobalKey<ReaderViewState>> open(
     WidgetTester tester,

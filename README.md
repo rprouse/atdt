@@ -24,8 +24,8 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 |---|---|---|
 | A | Rendering spike | Done; device checks pending ([report](docs/spike-report.md)) |
 | B | Ingestion and normalisation | Done |
-| C | Archive download and storage | In review: the full archive downloads, resumes and stores on device |
-| D | Library navigation | Not started |
+| C | Archive download and storage | Done; profile-mode perf check pending |
+| D | Library navigation | In review |
 | E | Font system | Not started |
 | F | Themes | Not started |
 | G | Reader polish | Not started |
@@ -49,19 +49,11 @@ flutter pub get
 flutter run
 ```
 
-The cloud icon in the reader's chrome opens the archive screen. It downloads every issue (about 31 MB) from archives.phrack.org into on-device storage, resumes after interruptions and checks for new issues. Stage D will open stored philes in the reader; until then the reader shows bundled files.
+The app opens on the list of Phrack issues. On first launch it explains the one-time download (about 31 MB from archives.phrack.org) and starts it when you confirm; issues appear as they arrive, and an interrupted download resumes. Tap an issue for its philes, and a phile to read it.
 
-The Stage A app is a single reader screen. Tap the text to show or hide the chrome. The chrome's menus switch the file, font (JetBrains Mono, BigBlue Terminal or C64 Pro Mono), theme and orientation (Auto, Portrait, Landscape). The bug icon shows a debug overlay with the computed font size, line height, top line, column offset, device pixel ratio and available width. The info icon opens the About dialog with font credits and licences.
+In the reader, tap the text to show or hide the chrome. The chrome switches font (JetBrains Mono, BigBlue Terminal or C64 Pro Mono), theme and orientation (Auto, Portrait, Landscape), and the bug icon shows a layout debug overlay. The settings screen (gear icon on the issues list) has the same choices plus About, with font credits and licences. The cloud icon checks for new issues.
 
-### Real philes for manual testing
-
-Phrack text is never committed to this repository. To test with real philes, download two into the git-ignored `assets/dev/` folder (Phrack 7/3 from 1986 and 72/1 from 2025), then rebuild:
-
-```sh
-dart run tool/fetch_dev_philes.dart
-```
-
-If `assets/dev/` has no philes, the app opens the 10,000-line synthetic fixture. Every fixture in `test/fixtures/` is in the file menu.
+Phrack text is never committed to this repository or bundled in the app: the app downloads it on the device.
 
 ## Testing
 
@@ -127,18 +119,22 @@ Timeline summaries are written to `build/scroll_perf_<font>.timeline_summary.jso
 lib/
   layout/      Pure Dart layout maths (no Flutter imports)
   ingest/      Pure Dart decoding and normalisation (no Flutter imports)
-  archive/     Pure Dart archive parsing (no Flutter imports)
+  archive/     Pure Dart archive parsing and downloading (no Flutter imports)
+  storage/     drift database: issues, philes, text chunks, catalog, settings
+  download/    Download controller and archive screen
+  library/     Issues (home and first launch) and issue screens
   reader/      The reader widget, its scroll structure, chrome and debug overlay
+  settings/    Settings screen
 assets/
   fonts/       Bundled fonts with their licences and attribution
-  dev/         Real philes for manual testing (git-ignored)
 test/
   fixtures/    Synthetic, byte-exact text fixtures
+  archive/fixtures/   Synthetic issue tarball
   reader/goldens/   Golden images (Linux-rendered)
   architecture_test.dart   Fails if a pure-Dart folder imports Flutter
-integration_test/
+integration_test/   Device tests (rotation, storage and scroll performance)
 test_driver/   Driver for the performance test
-tool/          Developer scripts (fixtures, dev philes, goldens)
+tool/          Developer scripts (fixtures, archive batch run, goldens)
 docs/          Spec, decisions log, spike report
 ```
 

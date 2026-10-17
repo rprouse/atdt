@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'download/download_controller.dart';
-import 'reader/reader_screen.dart';
+import 'library/issues_screen.dart';
 import 'reader/reader_settings.dart';
 
 class AtdtApp extends ConsumerStatefulWidget {
@@ -43,7 +43,7 @@ class _AtdtAppState extends ConsumerState<AtdtApp> {
       title: 'ATDT',
       debugShowCheckedModeBanner: false,
       theme: theme.toThemeData(),
-      home: const ReaderScreen(),
+      home: const IssuesScreen(),
     );
   }
 }

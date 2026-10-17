@@ -55,6 +55,11 @@ class _FakeSource implements ArchiveSource {
 class _FakeStore implements ArchiveStore {
   final saved = <int, ImportedIssue>{};
   final dates = <int, DateTime?>{};
+  final catalog = <int, DateTime?>{};
+
+  @override
+  Future<void> saveCatalog(Map<int, DateTime?> issues) async =>
+      catalog.addAll(issues);
 
   @override
   Future<Set<int>> storedIssueNumbers() async => saved.keys.toSet();
@@ -162,6 +167,17 @@ void main() {
     expect(last.phase, DownloadPhase.cancelled);
     expect(store.saved.keys, [1]);
   });
+
+  test(
+    'records the catalog before downloading, even if the run fails',
+    () async {
+      source = _FakeSource([1, 2, 3])..offlineAt = 1;
+      await downloader().run().toList();
+      expect(store.saved, isEmpty);
+      expect(store.catalog.keys, [1, 2, 3]);
+      expect(store.catalog[3], DateTime.utc(1988, 1, 1));
+    },
+  );
 
   test('missing release dates do not stop the download', () async {
     source = _FakeSource([1])..datesFail = true;

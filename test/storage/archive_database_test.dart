@@ -129,6 +129,86 @@ void main() {
     });
   });
 
+  group('library', () {
+    setUp(() => db = _memoryDb());
+
+    test('lists catalog and stored issues, newest first', () async {
+      await db.saveCatalog({
+        98: DateTime.utc(1998, 1, 1),
+        99: DateTime.utc(1999, 9, 9),
+        100: null,
+      });
+      await db.saveIssue(_fixtureIssue(), fetchedAt: _fetched);
+
+      final issues = await db.watchLibraryIssues().first;
+      expect(issues.map((i) => (i.number, i.downloaded, i.phileCount)), [
+        (100, false, 0),
+        (99, true, 3),
+        (98, false, 0),
+      ]);
+      // A stored issue without its own date falls back to the catalog's,
+      // and stays a UTC calendar date whatever the machine's timezone.
+      expect(issues[1].releaseDate, DateTime.utc(1999, 9, 9));
+      expect(issues[1].releaseDate!.isUtc, isTrue);
+      expect(issues.first.releaseDate, isNull);
+    });
+
+    test('updates when an issue is stored or the catalog grows', () async {
+      final updates = db.watchLibraryIssues();
+      final seen = <List<int>>[];
+      final sub = updates.listen(
+        (issues) => seen.add([for (final i in issues) i.number]),
+      );
+      await pumpEventQueue();
+      await db.saveCatalog({1: null});
+      await pumpEventQueue();
+      await db.saveIssue(_fixtureIssue(), fetchedAt: _fetched);
+      await pumpEventQueue();
+      await sub.cancel();
+
+      expect(seen.first, isEmpty);
+      expect(seen, contains(equals([1])));
+      expect(seen.last, [99, 1]);
+    });
+
+    test('philes are listed in number order', () async {
+      await db.saveIssue(_fixtureIssue(), fetchedAt: _fetched);
+      final philes = await db.watchPhiles(99).first;
+      expect(philes.map((p) => p.number), [1, 2, 10]);
+      expect(await db.phileById(philes.first.id), isNotNull);
+    });
+  });
+
+  test(
+    'upgrading a v1 database adds the catalog and keeps the archive',
+    () async {
+      final dir = Directory.systemTemp.createTempSync('atdt_migration');
+      // addTearDown runs before the group's tearDown, and Windows will not
+      // delete an open file, so close the database first here.
+      addTearDown(() async {
+        await db.close();
+        dir.deleteSync(recursive: true);
+      });
+      final file = File('${dir.path}/archive.sqlite');
+
+      // Build a v1 database: today's schema without the catalog.
+      final v1 = ArchiveDatabase(NativeDatabase(file));
+      await v1.saveIssue(_fixtureIssue(), fetchedAt: _fetched);
+      await v1.customStatement('DROP TABLE catalog');
+      await v1.customStatement('PRAGMA user_version = 1');
+      await v1.close();
+
+      db = ArchiveDatabase(NativeDatabase(file));
+      await db.saveCatalog({100: null});
+      final issues = await db.watchLibraryIssues().first;
+      expect(issues.map((i) => (i.number, i.downloaded)), [
+        (100, false),
+        (99, true),
+      ]);
+      expect(await db.readAllLines((await db.phile(99, 1))!.id), hasLength(3));
+    },
+  );
+
   test('settings round-trip and overwrite', () async {
     db = _memoryDb();
     expect(await db.setting('k'), isNull);

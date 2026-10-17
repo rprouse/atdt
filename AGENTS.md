@@ -8,7 +8,7 @@ ATDT is a Flutter (Dart) app for iOS and Android that reads the Phrack archive a
 
 ## Hard rules
 
-1. **Never commit Phrack text.** Real philes live only in the git-ignored `assets/dev/`. Tests use synthetic fixtures in `test/fixtures/` that you write yourself.
+1. **Never commit or bundle Phrack text.** The app downloads it on the device; no asset declaration may include it. Tests use synthetic fixtures in `test/fixtures/` that you write yourself; device tests generate text in code.
 2. **Never reflow or rewrap text.** Every line renders on exactly one visual row. `softWrap: false`, `maxLines: 1`, `overflow: TextOverflow.visible`.
 3. **Pure Dart cores.** Layout maths (`lib/layout/`), ingestion (`lib/ingest/`) and archive parsing and downloading (`lib/archive/`) must not import `package:flutter`. Keep them unit-testable with plain `dart test` semantics. Storage (`lib/storage/`) is pure drift except `database_file.dart`, which opens the file on a device.
 4. **Position is a tuple, never pixels.** Reading position is `(topLineIndex, fractionIntoLine, columnOffset)`. Restore from it after every metrics change.

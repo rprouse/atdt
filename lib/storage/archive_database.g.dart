@@ -1879,6 +1879,217 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   }
 }
 
+class $CatalogIssuesTable extends CatalogIssues
+    with TableInfo<$CatalogIssuesTable, CatalogIssue> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CatalogIssuesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _numberMeta = const VerificationMeta('number');
+  @override
+  late final GeneratedColumn<int> number = GeneratedColumn<int>(
+    'number',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _releaseDateMeta = const VerificationMeta(
+    'releaseDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> releaseDate = GeneratedColumn<DateTime>(
+    'release_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [number, releaseDate];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'catalog';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CatalogIssue> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('number')) {
+      context.handle(
+        _numberMeta,
+        number.isAcceptableOrUnknown(data['number']!, _numberMeta),
+      );
+    }
+    if (data.containsKey('release_date')) {
+      context.handle(
+        _releaseDateMeta,
+        releaseDate.isAcceptableOrUnknown(
+          data['release_date']!,
+          _releaseDateMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {number};
+  @override
+  CatalogIssue map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CatalogIssue(
+      number: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}number'],
+      )!,
+      releaseDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}release_date'],
+      ),
+    );
+  }
+
+  @override
+  $CatalogIssuesTable createAlias(String alias) {
+    return $CatalogIssuesTable(attachedDatabase, alias);
+  }
+}
+
+class CatalogIssue extends DataClass implements Insertable<CatalogIssue> {
+  final int number;
+  final DateTime? releaseDate;
+  const CatalogIssue({required this.number, this.releaseDate});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['number'] = Variable<int>(number);
+    if (!nullToAbsent || releaseDate != null) {
+      map['release_date'] = Variable<DateTime>(releaseDate);
+    }
+    return map;
+  }
+
+  CatalogIssuesCompanion toCompanion(bool nullToAbsent) {
+    return CatalogIssuesCompanion(
+      number: Value(number),
+      releaseDate: releaseDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(releaseDate),
+    );
+  }
+
+  factory CatalogIssue.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CatalogIssue(
+      number: serializer.fromJson<int>(json['number']),
+      releaseDate: serializer.fromJson<DateTime?>(json['releaseDate']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'number': serializer.toJson<int>(number),
+      'releaseDate': serializer.toJson<DateTime?>(releaseDate),
+    };
+  }
+
+  CatalogIssue copyWith({
+    int? number,
+    Value<DateTime?> releaseDate = const Value.absent(),
+  }) => CatalogIssue(
+    number: number ?? this.number,
+    releaseDate: releaseDate.present ? releaseDate.value : this.releaseDate,
+  );
+  CatalogIssue copyWithCompanion(CatalogIssuesCompanion data) {
+    return CatalogIssue(
+      number: data.number.present ? data.number.value : this.number,
+      releaseDate: data.releaseDate.present
+          ? data.releaseDate.value
+          : this.releaseDate,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CatalogIssue(')
+          ..write('number: $number, ')
+          ..write('releaseDate: $releaseDate')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(number, releaseDate);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CatalogIssue &&
+          other.number == this.number &&
+          other.releaseDate == this.releaseDate);
+}
+
+class CatalogIssuesCompanion extends UpdateCompanion<CatalogIssue> {
+  final Value<int> number;
+  final Value<DateTime?> releaseDate;
+  const CatalogIssuesCompanion({
+    this.number = const Value.absent(),
+    this.releaseDate = const Value.absent(),
+  });
+  CatalogIssuesCompanion.insert({
+    this.number = const Value.absent(),
+    this.releaseDate = const Value.absent(),
+  });
+  static Insertable<CatalogIssue> custom({
+    Expression<int>? number,
+    Expression<DateTime>? releaseDate,
+  }) {
+    return RawValuesInsertable({
+      if (number != null) 'number': number,
+      if (releaseDate != null) 'release_date': releaseDate,
+    });
+  }
+
+  CatalogIssuesCompanion copyWith({
+    Value<int>? number,
+    Value<DateTime?>? releaseDate,
+  }) {
+    return CatalogIssuesCompanion(
+      number: number ?? this.number,
+      releaseDate: releaseDate ?? this.releaseDate,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (number.present) {
+      map['number'] = Variable<int>(number.value);
+    }
+    if (releaseDate.present) {
+      map['release_date'] = Variable<DateTime>(releaseDate.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CatalogIssuesCompanion(')
+          ..write('number: $number, ')
+          ..write('releaseDate: $releaseDate')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$ArchiveDatabase extends GeneratedDatabase {
   _$ArchiveDatabase(QueryExecutor e) : super(e);
   $ArchiveDatabaseManager get managers => $ArchiveDatabaseManager(this);
@@ -1889,6 +2100,7 @@ abstract class _$ArchiveDatabase extends GeneratedDatabase {
   );
   late final $ReadingStatesTable readingStates = $ReadingStatesTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $CatalogIssuesTable catalogIssues = $CatalogIssuesTable(this);
   late final Index phileTextByLine = Index(
     'phile_text_by_line',
     'CREATE INDEX phile_text_by_line ON phile_text (phile_id, first_line)',
@@ -1903,6 +2115,7 @@ abstract class _$ArchiveDatabase extends GeneratedDatabase {
     phileTextChunks,
     readingStates,
     appSettings,
+    catalogIssues,
     phileTextByLine,
   ];
   @override
@@ -3601,6 +3814,160 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSetting,
       PrefetchHooks Function()
     >;
+typedef $$CatalogIssuesTableCreateCompanionBuilder =
+    CatalogIssuesCompanion Function({
+      Value<int> number,
+      Value<DateTime?> releaseDate,
+    });
+typedef $$CatalogIssuesTableUpdateCompanionBuilder =
+    CatalogIssuesCompanion Function({
+      Value<int> number,
+      Value<DateTime?> releaseDate,
+    });
+
+class $$CatalogIssuesTableFilterComposer
+    extends Composer<_$ArchiveDatabase, $CatalogIssuesTable> {
+  $$CatalogIssuesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get number => $composableBuilder(
+    column: $table.number,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get releaseDate => $composableBuilder(
+    column: $table.releaseDate,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CatalogIssuesTableOrderingComposer
+    extends Composer<_$ArchiveDatabase, $CatalogIssuesTable> {
+  $$CatalogIssuesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get number => $composableBuilder(
+    column: $table.number,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get releaseDate => $composableBuilder(
+    column: $table.releaseDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CatalogIssuesTableAnnotationComposer
+    extends Composer<_$ArchiveDatabase, $CatalogIssuesTable> {
+  $$CatalogIssuesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get number =>
+      $composableBuilder(column: $table.number, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get releaseDate => $composableBuilder(
+    column: $table.releaseDate,
+    builder: (column) => column,
+  );
+}
+
+class $$CatalogIssuesTableTableManager
+    extends
+        RootTableManager<
+          _$ArchiveDatabase,
+          $CatalogIssuesTable,
+          CatalogIssue,
+          $$CatalogIssuesTableFilterComposer,
+          $$CatalogIssuesTableOrderingComposer,
+          $$CatalogIssuesTableAnnotationComposer,
+          $$CatalogIssuesTableCreateCompanionBuilder,
+          $$CatalogIssuesTableUpdateCompanionBuilder,
+          (
+            CatalogIssue,
+            BaseReferences<
+              _$ArchiveDatabase,
+              $CatalogIssuesTable,
+              CatalogIssue
+            >,
+          ),
+          CatalogIssue,
+          PrefetchHooks Function()
+        > {
+  $$CatalogIssuesTableTableManager(
+    _$ArchiveDatabase db,
+    $CatalogIssuesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CatalogIssuesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CatalogIssuesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CatalogIssuesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> number = const Value.absent(),
+                Value<DateTime?> releaseDate = const Value.absent(),
+              }) => CatalogIssuesCompanion(
+                number: number,
+                releaseDate: releaseDate,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> number = const Value.absent(),
+                Value<DateTime?> releaseDate = const Value.absent(),
+              }) => CatalogIssuesCompanion.insert(
+                number: number,
+                releaseDate: releaseDate,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CatalogIssuesTable, CatalogIssue>(table),
+                  BaseReferences<
+                    _$ArchiveDatabase,
+                    $CatalogIssuesTable,
+                    CatalogIssue
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CatalogIssuesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$ArchiveDatabase,
+      $CatalogIssuesTable,
+      CatalogIssue,
+      $$CatalogIssuesTableFilterComposer,
+      $$CatalogIssuesTableOrderingComposer,
+      $$CatalogIssuesTableAnnotationComposer,
+      $$CatalogIssuesTableCreateCompanionBuilder,
+      $$CatalogIssuesTableUpdateCompanionBuilder,
+      (
+        CatalogIssue,
+        BaseReferences<_$ArchiveDatabase, $CatalogIssuesTable, CatalogIssue>,
+      ),
+      CatalogIssue,
+      PrefetchHooks Function()
+    >;
 
 class $ArchiveDatabaseManager {
   final _$ArchiveDatabase _db;
@@ -3615,4 +3982,6 @@ class $ArchiveDatabaseManager {
       $$ReadingStatesTableTableManager(_db, _db.readingStates);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$CatalogIssuesTableTableManager get catalogIssues =>
+      $$CatalogIssuesTableTableManager(_db, _db.catalogIssues);
 }

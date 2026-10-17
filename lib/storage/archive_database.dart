@@ -5,6 +5,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
@@ -117,24 +118,76 @@ abstract interface class ArchiveStore {
   });
 
   Future<ArchiveCounts> counts();
+
+  /// Records every issue the archive offers (and release dates, where
+  /// known), so the library can show undownloaded issues offline.
+  Future<void> saveCatalog(Map<int, DateTime?> issues);
+}
+
+/// Issues the archive offers, downloaded or not (schema v2).
+class CatalogIssues extends Table {
+  @override
+  String get tableName => 'catalog';
+
+  IntColumn get number => integer()();
+  DateTimeColumn get releaseDate => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {number};
+}
+
+/// One row of the library's issue list.
+class LibraryIssue {
+  const LibraryIssue({
+    required this.number,
+    required this.downloaded,
+    this.releaseDate,
+    this.phileCount = 0,
+  });
+
+  final int number;
+  final bool downloaded;
+
+  /// A calendar date, in UTC: read its year/month/day, never `.toLocal()`.
+  final DateTime? releaseDate;
+  final int phileCount;
 }
 
 @DriftDatabase(
-  tables: [Issues, Philes, PhileTextChunks, ReadingStates, AppSettings],
+  tables: [
+    Issues,
+    Philes,
+    PhileTextChunks,
+    ReadingStates,
+    AppSettings,
+    CatalogIssues,
+  ],
 )
 class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
-  ArchiveDatabase(super.executor, {this.chunkBytes = defaultChunkBytes});
+  ArchiveDatabase(
+    super.executor, {
+    this.chunkBytes = defaultChunkBytes,
+    this.decodeOnIsolateAbove = 256 * 1024,
+  });
 
   static const int defaultChunkBytes = 16 * 1024;
 
   /// Target size of a text chunk; small values let tests force many chunks.
   final int chunkBytes;
 
+  /// Philes larger than this are decoded on a short-lived isolate. Widget
+  /// tests raise it, because real isolates never finish under fake time.
+  final int decodeOnIsolateAbove;
+
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      // v2 adds the catalog of available issues.
+      if (from < 2) await m.createTable(catalogIssues);
+    },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },
@@ -206,6 +259,55 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
     );
   }
 
+  @override
+  Future<void> saveCatalog(Map<int, DateTime?> issues) => batch((b) {
+    b.insertAllOnConflictUpdate(catalogIssues, [
+      for (final MapEntry(key: number, value: date) in issues.entries)
+        CatalogIssuesCompanion.insert(
+          number: Value(number),
+          releaseDate: Value(date),
+        ),
+    ]);
+  });
+
+  /// Every known issue, newest first: the catalog plus anything stored,
+  /// with stored dates preferred. Updates as issues are downloaded.
+  Stream<List<LibraryIssue>> watchLibraryIssues() =>
+      customSelect(
+        'SELECT n.number AS number, '
+        'COALESCE(i.release_date, c.release_date) AS release_date, '
+        'i.number IS NOT NULL AS downloaded, '
+        '(SELECT count(*) FROM philes p WHERE p.issue = n.number) AS phile_count '
+        'FROM (SELECT number FROM catalog UNION SELECT number FROM issues) n '
+        'LEFT JOIN issues i ON i.number = n.number '
+        'LEFT JOIN catalog c ON c.number = n.number '
+        'ORDER BY n.number DESC',
+        readsFrom: {issues, philes, catalogIssues},
+      ).watch().map(
+        (rows) => [
+          for (final r in rows)
+            LibraryIssue(
+              number: r.read<int>('number'),
+              downloaded: r.read<bool>('downloaded'),
+              // drift reads DateTime back in local time; release dates are
+              // calendar dates stored at UTC midnight, so keep them in UTC or
+              // they show as the previous day west of Greenwich.
+              releaseDate: r.readNullable<DateTime>('release_date')?.toUtc(),
+              phileCount: r.read<int>('phile_count'),
+            ),
+        ],
+      );
+
+  /// An issue's philes in reading order.
+  Stream<List<Phile>> watchPhiles(int issue) =>
+      (select(philes)
+            ..where((p) => p.issue.equals(issue))
+            ..orderBy([(p) => OrderingTerm.asc(p.number)]))
+          .watch();
+
+  Future<Phile?> phileById(int id) =>
+      (select(philes)..where((p) => p.id.equals(id))).getSingleOrNull();
+
   Future<String?> setting(String key) async => (await (select(
     appSettings,
   )..where((s) => s.key.equals(key))).getSingleOrNull())?.value;
@@ -239,18 +341,26 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
   }
 
   /// Every line of a phile, for the reader.
+  ///
+  /// Large philes are decoded on a short-lived isolate: 71/7 is 16 MB and
+  /// would freeze the UI for its whole decode.
   Future<List<String>> readAllLines(int phileId) async {
     final chunks =
         await (select(phileTextChunks)
               ..where((c) => c.phileId.equals(phileId))
               ..orderBy([(c) => OrderingTerm.asc(c.chunk)]))
             .get();
-    return [
-      for (final c in chunks)
-        ...const LineSplitter().convert(utf8.decode(c.data)),
-    ];
+    final data = [for (final c in chunks) c.data];
+    final bytes = data.fold(0, (n, d) => n + d.length);
+    return bytes > decodeOnIsolateAbove
+        ? Isolate.run(() => _decodeChunks(data))
+        : _decodeChunks(data);
   }
 }
+
+List<String> _decodeChunks(List<Uint8List> chunks) => [
+  for (final c in chunks) ...const LineSplitter().convert(utf8.decode(c)),
+];
 
 typedef TextChunk = ({int firstLine, int lineCount, Uint8List data});
 

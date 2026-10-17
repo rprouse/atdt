@@ -5,17 +5,21 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../download/download_screen.dart';
-import 'about.dart';
+import '../library/library_providers.dart';
 import 'debug_overlay.dart';
 import 'reader_font.dart';
 import 'reader_settings.dart';
 import 'reader_theme.dart';
 import 'reader_view.dart';
 
-/// The Stage A spike's only screen: the reader plus a debug chrome.
+/// Reads one stored phile, with chrome overlaid on the text.
 class ReaderScreen extends ConsumerStatefulWidget {
-  const ReaderScreen({super.key});
+  const ReaderScreen({required this.phileId, this.title, super.key});
+
+  final int phileId;
+
+  /// Shown while the text loads; the stored title once it has.
+  final String? title;
 
   @override
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
@@ -28,6 +32,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   @override
   void dispose() {
     _diagnostics.dispose();
+    // Leaving the reader with the chrome hidden must not strand the app in
+    // immersive mode.
+    if (!_chromeVisible) {
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    }
     super.dispose();
   }
 
@@ -50,17 +59,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
     final theme = settings.theme;
-    final path = ref.watch(currentDocumentPathProvider).value;
-    final document = path == null ? null : ref.watch(documentProvider(path));
+    final phile = ref.watch(storedPhileProvider(widget.phileId));
+    final title = phile.value?.meta.title ?? widget.title ?? '';
 
-    final Widget body = switch (document) {
-      null => const SizedBox.expand(),
+    final Widget body = switch (phile) {
       AsyncData(:final value) => GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => _setChromeVisible(!_chromeVisible),
         child: ReaderView(
           key: const ValueKey('reader'),
-          text: value,
+          text: value.text,
           font: settings.font,
           foreground: theme.foreground,
           onVerticalUserScroll: _onVerticalUserScroll,
@@ -70,7 +78,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       AsyncError(:final error) => Center(
         child: Text('$error', style: TextStyle(color: theme.foreground)),
       ),
-      _ => const SizedBox.expand(),
+      _ => Center(child: CircularProgressIndicator(color: theme.accent)),
     };
 
     return Scaffold(
@@ -91,7 +99,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 offset: _chromeVisible ? Offset.zero : const Offset(0, -1),
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOut,
-                child: _TopBar(path: path, theme: theme),
+                child: _TopBar(title: title, theme: theme),
               ),
             ),
           ),
@@ -112,17 +120,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 }
 
 class _TopBar extends ConsumerWidget {
-  const _TopBar({required this.path, required this.theme});
+  const _TopBar({required this.title, required this.theme});
 
-  final String? path;
+  final String title;
   final ReaderTheme theme;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(readerSettingsProvider);
     final notifier = ref.read(readerSettingsProvider.notifier);
-    final docs = ref.watch(availableDocumentsProvider).value ?? const [];
-    final name = path?.split('/').last ?? 'ATDT';
 
     return Material(
       key: const ValueKey('chrome'),
@@ -134,20 +140,14 @@ class _TopBar extends ConsumerWidget {
           data: IconThemeData(color: theme.accent),
           child: Row(
             children: [
-              const SizedBox(width: 16),
+              const BackButton(),
               Expanded(
                 child: Text(
-                  name,
+                  title,
+                  key: const ValueKey('reader-title'),
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: theme.foreground, fontSize: 16),
                 ),
-              ),
-              _Menu<String>(
-                tooltip: 'File',
-                icon: Icons.description_outlined,
-                selected: path,
-                items: {for (final d in docs) d: d.split('/').last},
-                onSelected: notifier.setDocument,
               ),
               _Menu<String>(
                 tooltip: 'Font',
@@ -178,20 +178,6 @@ class _TopBar extends ConsumerWidget {
                       : Icons.bug_report_outlined,
                 ),
                 onPressed: notifier.toggleDebugOverlay,
-              ),
-              IconButton(
-                tooltip: 'Archive',
-                icon: const Icon(Icons.cloud_download_outlined),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const DownloadScreen(),
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'About',
-                icon: const Icon(Icons.info_outline),
-                onPressed: () => showAtdtAbout(context),
               ),
             ],
           ),
