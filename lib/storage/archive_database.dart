@@ -117,10 +117,50 @@ abstract interface class ArchiveStore {
   });
 
   Future<ArchiveCounts> counts();
+
+  /// Records every issue the archive offers (and release dates, where
+  /// known), so the library can show undownloaded issues offline.
+  Future<void> saveCatalog(Map<int, DateTime?> issues);
+}
+
+/// Issues the archive offers, downloaded or not (schema v2).
+class CatalogIssues extends Table {
+  @override
+  String get tableName => 'catalog';
+
+  IntColumn get number => integer()();
+  DateTimeColumn get releaseDate => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {number};
+}
+
+/// One row of the library's issue list.
+class LibraryIssue {
+  const LibraryIssue({
+    required this.number,
+    required this.downloaded,
+    this.releaseDate,
+    this.phileCount = 0,
+  });
+
+  final int number;
+  final bool downloaded;
+
+  /// A calendar date, in UTC: read its year/month/day, never `.toLocal()`.
+  final DateTime? releaseDate;
+  final int phileCount;
 }
 
 @DriftDatabase(
-  tables: [Issues, Philes, PhileTextChunks, ReadingStates, AppSettings],
+  tables: [
+    Issues,
+    Philes,
+    PhileTextChunks,
+    ReadingStates,
+    AppSettings,
+    CatalogIssues,
+  ],
 )
 class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
   ArchiveDatabase(super.executor, {this.chunkBytes = defaultChunkBytes});
@@ -131,10 +171,14 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
   final int chunkBytes;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      // v2 adds the catalog of available issues.
+      if (from < 2) await m.createTable(catalogIssues);
+    },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },
@@ -205,6 +249,55 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
       philes: p.read(phileCount)!,
     );
   }
+
+  @override
+  Future<void> saveCatalog(Map<int, DateTime?> issues) => batch((b) {
+    b.insertAllOnConflictUpdate(catalogIssues, [
+      for (final MapEntry(key: number, value: date) in issues.entries)
+        CatalogIssuesCompanion.insert(
+          number: Value(number),
+          releaseDate: Value(date),
+        ),
+    ]);
+  });
+
+  /// Every known issue, newest first: the catalog plus anything stored,
+  /// with stored dates preferred. Updates as issues are downloaded.
+  Stream<List<LibraryIssue>> watchLibraryIssues() =>
+      customSelect(
+        'SELECT n.number AS number, '
+        'COALESCE(i.release_date, c.release_date) AS release_date, '
+        'i.number IS NOT NULL AS downloaded, '
+        '(SELECT count(*) FROM philes p WHERE p.issue = n.number) AS phile_count '
+        'FROM (SELECT number FROM catalog UNION SELECT number FROM issues) n '
+        'LEFT JOIN issues i ON i.number = n.number '
+        'LEFT JOIN catalog c ON c.number = n.number '
+        'ORDER BY n.number DESC',
+        readsFrom: {issues, philes, catalogIssues},
+      ).watch().map(
+        (rows) => [
+          for (final r in rows)
+            LibraryIssue(
+              number: r.read<int>('number'),
+              downloaded: r.read<bool>('downloaded'),
+              // drift reads DateTime back in local time; release dates are
+          // calendar dates stored at UTC midnight, so keep them in UTC or
+          // they show as the previous day west of Greenwich.
+          releaseDate: r.readNullable<DateTime>('release_date')?.toUtc(),
+              phileCount: r.read<int>('phile_count'),
+            ),
+        ],
+      );
+
+  /// An issue's philes in reading order.
+  Stream<List<Phile>> watchPhiles(int issue) =>
+      (select(philes)
+            ..where((p) => p.issue.equals(issue))
+            ..orderBy([(p) => OrderingTerm.asc(p.number)]))
+          .watch();
+
+  Future<Phile?> phileById(int id) =>
+      (select(philes)..where((p) => p.id.equals(id))).getSingleOrNull();
 
   Future<String?> setting(String key) async => (await (select(
     appSettings,

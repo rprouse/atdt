@@ -115,9 +115,12 @@ class ArchiveDownloader {
           if (!stored.contains(n)) n,
       ];
       total = missing.length;
-      if (missing.isEmpty) return await finish(DownloadPhase.done);
 
+      // Record what exists before downloading anything, so the library can
+      // list undownloaded issues even if this run fails.
       final dates = await source.releaseDates(cancel: cancel);
+      await store.saveCatalog({for (final n in available) n: dates[n]});
+      if (missing.isEmpty) return await finish(DownloadPhase.done);
 
       for (final (index, issue) in missing.indexed) {
         if (index > 0) await _pause(cancel);
