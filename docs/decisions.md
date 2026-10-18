@@ -296,3 +296,35 @@ ferent`).
     - It reads only the local database, so it works offline (tested with the archive offline).
   - **Jump to match:** the reader opens with the first matching line a third of the way down the screen, clear of the chrome overlay. It scrolls sideways only if the match lies beyond the visible columns of a wide line. Matches on every line are highlighted with a span background in the theme's selection colour, which never changes glyph advances; a test checks that every character stays on the column grid, and a golden records it.
 - **Not part of Stage H:** with data stored, the emulator takes 10–16 s to show the first frame (4.2 s of it before framework init). A profile build of `main` from before this stage behaves the same, and a launch with no data takes about 3 s. This needs a look on a real device in Stage K.
+
+## 2026-10-17: Section navigation (Stage I)
+
+- **Checked (Verify: section patterns):** surveyed every line of all 1,026 philes for heading-like shapes: bracketed dashes, `|=[ ]=` boxes, numbered and Roman-numeral lists, `[N]` references. Then iterated the parser against the archive with `tool/sections_report.dart`. That tool lists each phile's outline, any repeated heading, and every phile with numbered-looking lines that got no outline. It also runs the early-era check.
+- **Found:**
+  - **One family dominates modern Phrack:** `--[ N - Title`, with the number giving the nesting (`----[ 2.1 - …`, `------[ 2.1.1 - …`).
+  - **Variants:**
+    - Compilations mark articles with `|=[ 0xNN - Title ]=---=|`, `|=[ 0xNN ]=---=[ Title ]=---=|`, or a decimal `|=---=[ N - Title ]=---=|`, and restart numbering inside each article.
+    - Some philes close the number in the bracket: `--[1.1]-- Title` (52/3), or `----[  3.0]  Overview` (55/14).
+    - 70/4 uses three-digit numbers (`001.002`), and 62/13 uses `-[0x01] :: Title`.
+  - **No reliable pattern before issue 52.**
+    - Numbered and Roman-numeral lines are lists ("1. When the operator answers…").
+    - `[1]` lines are references.
+    - Unnumbered `--[ Title` lines mix real headings with banners (`---[ Phrack Magazine Volume 7…`), `[ END OF FILE ]`, author emails and shell prompts.
+    - Loopback's `|=[ 0x00 ]=` dividers carry numbers but no titles.
+  - **Contents lists:** some philes (67/9, 68/9, 69/4) repeat every heading in a contents list in the heading format, sometimes worded slightly differently ("Further readings" against "Further reading").
+- **Changed:**
+  - **Parser** (`lib/sections/`, pure Dart). It accepts only numbered headings starting at column 0, in the four formats above, plus "Appendix X". Titles are trimmed of brackets, rules and box edges; titles over 72 characters are rejected.
+  - **Nesting:**
+    - Nesting comes from the number, never the dashes.
+    - `N.0` is top level, unless it directly follows plain `N`.
+    - Hex numbers and `|=[ ]=` boxes are articles, and everything else sits one level below them.
+  - **Conservative rules:**
+    - At least two headings, or nothing.
+    - Numbers may only go forwards or restart at 0 or 1 (the next article). Any other backwards step discards the whole outline.
+    - In a dense run of headings whose entries mostly reappear later, the part up to the last repeated entry is a contents list. It's dropped, so entries jump to the real headings. A two-entry run must repeat exactly, so a compilation repeating "1 - Introduction" per article keeps both.
+  - **Result:** 174 of 1,026 philes (issues 52–72) get a jump list, with 2,949 headings in all. The only repeated headings left are in 72/3, a compilation, one per article. The 12 philes with numbered-looking lines but no outline are all correct refusals: untitled Loopback dividers (57/2, 57/3, 58/2, 58/3, 59/2, 60/2, 61/2, 62/2, 63/2, 71/4), an ASCII diagram (40/7), and unnumbered headings (69/9).
+  - **Early-era check (spec acceptance):** the 20 philes from issues 1–40 with the most heading-like lines (numbered lists, Roman numerals, bracketed banners, references), and how many each had: 25/2 (263), 36/6 (113), 20/4 (83), 40/7 (78), 35/8 (54), 9/6 (36), 13/9 (29), 27/5 (23), 37/4 (20), 26/11 (20), 15/5 (19), 5/3 (17), 17/5 (14), 29/11 (14), 27/12 (13), 20/1 (12), 27/1 (12), 29/9 (12), 15/8 (11), 21/1 (11). **Sections found: 0 in all 20, so no false positives.**
+  - **Reader:**
+    - Sections are parsed when a phile loads. A first-character prefilter keeps the scan cheap, even for 71/7.
+    - A **Sections** button appears in the chrome only when headings were found. It opens a sheet, indented by level, that marks and scrolls to the section being read.
+    - Choosing a section puts its heading on the top line and hides the chrome, so nothing covers it.

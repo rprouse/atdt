@@ -148,6 +148,14 @@ class ReaderViewState extends State<ReaderView> {
     );
   }
 
+  /// Puts [line] at the top of the screen (a section heading).
+  void jumpToLine(int line) {
+    final layout = _layout;
+    final v = _vertical;
+    if (layout == null || v == null || !v.hasClients) return;
+    v.jumpTo((line * layout.lineHeight).clamp(0.0, v.position.maxScrollExtent));
+  }
+
   ScrollController? get verticalController => _vertical;
   ScrollController? get horizontalController => _horizontal;
 
