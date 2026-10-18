@@ -1,7 +1,7 @@
 import 'dart:developer' as developer;
 import 'dart:io' show Platform;
 import 'dart:math' as math;
-import 'dart:ui' show DisplayFeatureType;
+import 'dart:ui' show DisplayFeatureState, DisplayFeatureType;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
@@ -581,5 +581,36 @@ EdgeInsets stableHorizontalInsets(MediaQueryData mediaQuery, double width) {
     if (bounds.left <= 1) left = math.max(left, bounds.right);
     if (bounds.right >= width - 1) right = math.max(right, width - bounds.left);
   }
-  return EdgeInsets.only(left: left, right: right);
+  return _avoidVerticalHinge(
+    mediaQuery,
+    width,
+    EdgeInsets.only(left: left, right: right),
+  );
+}
+
+/// A hinge, or a fold that is half open, splitting the window left from
+/// right would put the 80 columns across the gap. The text takes the larger
+/// pane instead. A fold lying flat separates nothing and is ignored, as is
+/// a horizontal one (tabletop): it crosses lines, it does not split them.
+EdgeInsets _avoidVerticalHinge(
+  MediaQueryData mediaQuery,
+  double width,
+  EdgeInsets insets,
+) {
+  for (final feature in mediaQuery.displayFeatures) {
+    final separating =
+        feature.type == DisplayFeatureType.hinge ||
+        (feature.type == DisplayFeatureType.fold &&
+            feature.state == DisplayFeatureState.postureHalfOpened);
+    final bounds = feature.bounds;
+    final vertical =
+        bounds.height >= mediaQuery.size.height - 1 &&
+        bounds.left > 1 &&
+        bounds.right < width - 1;
+    if (!separating || !vertical) continue;
+    return bounds.left >= width - bounds.right
+        ? insets.copyWith(right: math.max(insets.right, width - bounds.left))
+        : insets.copyWith(left: math.max(insets.left, bounds.right));
+  }
+  return insets;
 }
