@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
+import 'frame_stats.dart';
 import 'reader_theme.dart';
 import 'reader_view.dart';
 
-/// Live layout numbers for checking the spike on a device.
-class DebugOverlay extends StatelessWidget {
+/// Live layout numbers and frame times, for checking the reader on a
+/// device. Frame times are only meaningful in profile or release builds.
+class DebugOverlay extends StatefulWidget {
   const DebugOverlay({
     required this.diagnostics,
     required this.theme,
@@ -17,10 +20,40 @@ class DebugOverlay extends StatelessWidget {
   final String fontFamily;
 
   @override
+  State<DebugOverlay> createState() => _DebugOverlayState();
+}
+
+class _DebugOverlayState extends State<DebugOverlay> {
+  final _stats = FrameStats(budget: sixtyFpsBudget);
+  final _frames = ValueNotifier(0);
+
+  @override
+  void initState() {
+    super.initState();
+    SchedulerBinding.instance.addTimingsCallback(_onTimings);
+  }
+
+  @override
+  void dispose() {
+    SchedulerBinding.instance.removeTimingsCallback(_onTimings);
+    _frames.dispose();
+    super.dispose();
+  }
+
+  void _onTimings(List<FrameTiming> timings) {
+    for (final t in timings) {
+      _stats.add(build: t.buildDuration, raster: t.rasterDuration);
+    }
+    if (mounted) _frames.value++;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ReaderDiagnostics?>(
-      valueListenable: diagnostics,
-      builder: (context, d, _) {
+    final theme = widget.theme;
+    return ListenableBuilder(
+      listenable: Listenable.merge([widget.diagnostics, _frames]),
+      builder: (context, _) {
+        final d = widget.diagnostics.value;
         if (d == null) return const SizedBox.shrink();
         final l = d.layout;
         final p = d.position;
@@ -44,6 +77,7 @@ class DebugOverlay extends StatelessWidget {
           'available width': l.availableWidth.toStringAsFixed(2),
           'text left': l.textLeft.toStringAsFixed(2),
           'columns': '${l.contentColumns}',
+          ..._frameRows(_stats, View.of(context).display.refreshRate),
         };
         return DecoratedBox(
           key: const ValueKey('debug-overlay'),
@@ -57,7 +91,7 @@ class DebugOverlay extends StatelessWidget {
               style: TextStyle(
                 color: theme.foreground,
                 fontSize: 11,
-                fontFamily: fontFamily,
+                fontFamily: widget.fontFamily,
                 height: 1.3,
               ),
               child: Column(
@@ -74,4 +108,20 @@ class DebugOverlay extends StatelessWidget {
       },
     );
   }
+}
+
+String _ms(Duration d) => (d.inMicroseconds / 1000).toStringAsFixed(1);
+
+/// No frame over 16.7 ms means 60 fps or better, on any display.
+Map<String, String> _frameRows(FrameStats stats, double refreshRate) {
+  final display = {'display': '${refreshRate.round()} Hz'};
+  if (stats.frames == 0) return {...display, 'frames': 'scroll to measure'};
+  return {
+    ...display,
+    'build p90': '${_ms(stats.buildP90)} ms',
+    'raster p90': '${_ms(stats.rasterP90)} ms',
+    'over ${_ms(stats.budget)} ms':
+        '${stats.overBudget} of last '
+        '${stats.frames} (60 fps)',
+  };
 }

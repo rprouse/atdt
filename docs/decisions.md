@@ -340,11 +340,21 @@ ferent`).
   - **The y-flip documentation is wrong for this version.** The docs say shaders must flip y on OpenGL ES. On this engine the documented `#ifdef IMPELLER_TARGET_OPENGLES` flip turned the reader **upside down**; without it the image is upright. **Not yet checked on a Vulkan phone or on iOS (Metal).**
   - **The emulator can't judge 60 fps.** Its emulated GPU rasterises the plain reader at an average of 201 ms per frame in profile mode (130 of 135 frames over budget). The CRT pass ran afterwards, warmed up, and averaged 73 ms. Neither says anything about a phone.
 - **Changed:**
-  - **Shader** (`shaders/crt.frag`):
-    - Scanlines every 3 logical pixels (sized with the device pixel ratio), a four-tap bloom added on top of each pixel, and a pull toward the theme's foreground at each pixel's brightness. Each scaled by an intensity uniform.
+  - **Shader** (`shaders/crt.frag`). At full intensity:
+    - **Scanlines:** dark gaps (up to 75%) every 2.5 logical pixels, sized with the device pixel ratio.
+    - **Bloom:** two tight eight-tap rings (¾ and 1½ logical pixels).
+    - **Phosphor:** a 55% pull toward the theme's foreground at each pixel's brightness, plus a faint lift of the background in that colour, so scanlines show across the black too.
+    - **Vignette:** the edges darken up to 45%.
     - Every pixel keeps its own sample at its own coordinate, with no distortion or curvature, so no line can move.
+  - **Owner feedback (2026-10-17, Galaxy S23 Ultra):** "responsive and looks good", but the first tuning was "overly subtle", noticeable only at 100% and zoomed in. Causes:
+    - Scanlines could only darken a mostly black screen, by at most 35% in a soft 3-point cosine.
+    - The glow was too small to see at arm's length.
+    - The retune above fixes both. A first retune widened the bloom to 3 logical pixels along the axes only, which drew ghost copies of each glyph; tight eight-tap rings fixed that.
   - **Where it applies:** `ImageFiltered` wraps the reader only, never the chrome. It's off by default, with an intensity slider (default 60%), and all three settings persist.
   - **Accessibility:** the effect stays off while Remove animations, Reduce Motion, high contrast or Reduce Transparency is on. Reduce Transparency is read from `UIAccessibility.isReduceTransparencyEnabled` over the `org.prouse.atdt/accessibility` channel, again when the app resumes. **That Swift code is not built or verified: it needs a Mac.**
-  - **Benchmark fallback:** no reference phone is available, so the "quick benchmark" runs on the device itself. In profile and release builds `FrameBudgetGuard` watches raster times while the effect is on. If more than a quarter of a 120-frame window misses the display's frame budget, it turns the effect off, says so in Settings and a snackbar, and remembers. Turning the effect on again clears that.
+  - **Benchmark fallback:** no reference phone is available, so the "quick benchmark" runs on the device itself. In profile and release builds `FrameBudgetGuard` watches raster times while the effect is on. If more than a quarter of a 120-frame window misses **16.7 ms**, it turns the effect off, says so in Settings and a snackbar, and remembers. Turning the effect on again clears that.
+    - It was first written against the display's refresh rate, which would wrongly fail a 120 Hz phone (8.3 ms per refresh) that easily holds the spec's 60 fps. It now always uses 16.7 ms.
+    - Seen working on the emulator: its slow GPU tripped the guard, and Settings said "Turned off: this device could not keep up with it".
+  - **Debug overlay frame figures** (asked for by the owner): display refresh rate, 90th-percentile build and raster times, and how many of the last 60 frames went over 16.7 ms, from engine `FrameTiming`s. Zero over budget while scrolling means 60 fps or better.
   - **Settings** explain why the effect isn't showing: unavailable (no Impeller), paused (accessibility), or turned off (too slow).
   - **The acceptance check needs a person:** 60 fps in profile mode with the effect on, on a mid-range phone. `integration_test/scroll_perf_test.dart` now writes `scroll_perf_crt.timeline_summary.json` next to the plain runs for that comparison.

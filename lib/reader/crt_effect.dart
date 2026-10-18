@@ -8,6 +8,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'frame_stats.dart';
 import 'reader_settings.dart';
 
 /// Why the CRT effect is not drawn, or null when it is.
@@ -158,12 +159,11 @@ class CrtEffectState extends ConsumerState<CrtEffect> {
     super.dispose();
   }
 
-  void _startGuard(double refreshRate) {
+  // Judged against 60 fps, not the display's rate: a 120 Hz phone that
+  // holds 60 fps with the effect meets the spec and keeps it.
+  void _startGuard() {
     if (!widget.guardFrames || _guard != null) return;
-    final hz = refreshRate > 0 ? refreshRate : 60;
-    _guard = FrameBudgetGuard(
-      budget: Duration(microseconds: (1e6 / hz).round()),
-    );
+    _guard = FrameBudgetGuard(budget: sixtyFpsBudget);
     SchedulerBinding.instance.addTimingsCallback(onTimings);
   }
 
@@ -218,7 +218,7 @@ class CrtEffectState extends ConsumerState<CrtEffect> {
       _stopGuard();
       return widget.child;
     }
-    _startGuard(View.of(context).display.refreshRate);
+    _startGuard();
 
     // Uniforms after u_size (0-1, set by the engine): intensity, tint, dpr.
     final shader = _shaderFor(program!)
