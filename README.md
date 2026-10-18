@@ -107,7 +107,7 @@ On Linux, `flutter test --update-goldens` works directly.
 
 ### Device tests
 
-Run each integration test file on its own; device runs do not handle several files at once. CI runs the first four on an Android emulator and an iPhone simulator. Note that `flutter test integration_test` uninstalls the app afterwards on Android, taking a downloaded archive with it.
+Run each integration test file on its own; device runs do not handle several files at once. CI runs the launch, rotation and reading-position tests on an Android emulator and an iPhone simulator; the benchmarks need a real device. Note that `flutter test integration_test` uninstalls the app afterwards on Android, taking a downloaded archive with it.
 
 ```sh
 flutter test integration_test/app_test.dart -d <device>
