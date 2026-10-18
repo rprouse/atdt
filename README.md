@@ -28,8 +28,8 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 | D | Library navigation | Done |
 | E | Font system | Done |
 | F | Themes | Done |
-| G | Reader polish | In review |
-| H | Search | Not started |
+| G | Reader polish | Done |
+| H | Search | In review |
 | I | Section navigation | Not started |
 | J | CRT effect | Not started |
 | K | Release hardening | Not started |
@@ -72,6 +72,12 @@ dart run tool/ingest_archive.dart          # all issues; or: ... 1 10
 
 Issue tarballs are downloaded once (1 s apart) into the git-ignored `tool/out/archive/`; the report is `tool/out/ingest_report.csv`.
 
+With those tarballs cached, a second tool imports the whole archive, builds the search index, and reports its size and query times:
+
+```sh
+dart run tool/search_bench.dart            # writes tool/out/search_bench.sqlite
+```
+
 ### Adding a font
 
 Put the font file in `assets/fonts/files/` and its licence text in `assets/fonts/licences/`, then add an entry to `assets/fonts/manifest.json`. No code or pubspec changes are needed; `test/fonts/font_manifest_test.dart` checks the entry, the files and the licence.
@@ -106,6 +112,7 @@ flutter test integration_test/app_test.dart -d <device>
 flutter test integration_test/reader_rotation_test.dart -d <device>
 flutter test integration_test/storage_perf_test.dart -d <device>   # readLine < 5 ms (asserted in profile/release)
 flutter test integration_test/reader_polish_test.dart -d <device>   # position across sessions, orientation
+flutter test integration_test/search_perf_test.dart -d <device>   # search < 300 ms over an archive-sized index (asserted in profile/release)
 ```
 
 ### Scrolling performance
@@ -126,9 +133,10 @@ lib/
   ingest/      Pure Dart decoding and normalisation (no Flutter imports)
   fonts/       Pure Dart font manifest and cmap coverage (no Flutter imports)
   archive/     Pure Dart archive parsing and downloading (no Flutter imports)
-  storage/     drift database: issues, philes, text chunks, catalog, settings
+  search/      Pure Dart query parsing and match highlighting (no Flutter imports)
+  storage/     drift database: issues, philes, text chunks, catalog, settings, search index
   download/    Download controller and archive screen
-  library/     Issues (home and first launch) and issue screens
+  library/     Issues (home and first launch), issue and search screens, search indexer
   reader/      The reader widget, its scroll structure, chrome and debug overlay
   settings/    Settings screen
 assets/
@@ -138,9 +146,9 @@ test/
   archive/fixtures/   Synthetic issue tarball
   reader/goldens/   Golden images (Linux-rendered)
   architecture_test.dart   Fails if a pure-Dart folder imports Flutter
-integration_test/   Device tests (rotation, position, orientation, storage and scroll performance)
+integration_test/   Device tests (rotation, position, orientation, storage, scroll and search performance)
 test_driver/   Driver for the performance test
-tool/          Developer scripts (fixtures, archive batch run, goldens)
+tool/          Developer scripts (fixtures, archive batch run, search benchmark, goldens)
 docs/          Spec, decisions log, spike report
 ```
 

@@ -2,6 +2,7 @@
 // tool/goldens/ for regenerating these on Windows or macOS via Docker.
 import 'package:atdt/reader/reader_font.dart';
 import 'package:atdt/reader/reader_theme.dart';
+import 'package:atdt/search/search_query.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -97,6 +98,27 @@ void main() {
       skip: !goldensSupported,
     );
   }
+
+  // Search matches are marked without moving a column (spec Stage H).
+  testWidgets('search matches are highlighted', (tester) async {
+    setSurface(tester, _sizes['portrait']!);
+    addTearDown(tester.view.reset);
+    final theme = builtInThemes.first;
+    await tester.pumpWidget(
+      readerApp(
+        text: fixture('tabs_code.txt'),
+        font: jetBrainsMono,
+        background: theme.background,
+        foreground: theme.foreground,
+        selection: theme.selection,
+        highlight: SearchQuery.parse('int printf'),
+      ),
+    );
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('goldens/search_highlight.png'),
+    );
+  }, skip: !goldensSupported);
 
   testWidgets(
     'ligature-prone sequences render as separate characters',

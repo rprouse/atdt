@@ -11,6 +11,7 @@ import '../download/download_controller.dart';
 import '../layout/reading_position.dart';
 import '../layout/text_block.dart';
 import '../library/library_providers.dart';
+import '../search/search_query.dart';
 import '../storage/archive_database.dart';
 import 'debug_overlay.dart';
 import 'reader_font.dart';
@@ -21,12 +22,23 @@ import 'volume_keys.dart';
 
 /// Reads one stored phile, with chrome overlaid on the text.
 class ReaderScreen extends ConsumerStatefulWidget {
-  const ReaderScreen({required this.phileId, this.title, super.key});
+  const ReaderScreen({
+    required this.phileId,
+    this.title,
+    this.revealLine,
+    this.highlight,
+    super.key,
+  });
 
   final int phileId;
 
   /// Shown while the text loads; the stored title once it has.
   final String? title;
+
+  /// From a search result: open at this line, with the query's matches
+  /// highlighted, instead of at the saved position.
+  final int? revealLine;
+  final SearchQuery? highlight;
 
   @override
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
@@ -191,6 +203,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           initialPosition: value.position ?? const ReadingPosition.top(),
           selection: _selection,
           selectionColor: theme.selection,
+          revealLine: widget.revealLine,
+          highlight: widget.highlight,
         ),
       ),
       AsyncError(:final error) => Center(
