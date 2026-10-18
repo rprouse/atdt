@@ -30,6 +30,9 @@ class ReaderSettings {
     this.showDebugOverlay = false,
     this.keepAwake = true,
     this.volumePaging = false,
+    this.crt = false,
+    this.crtIntensity = 0.6,
+    this.crtTooSlow = false,
   });
 
   /// Null means the manifest's default font.
@@ -46,6 +49,14 @@ class ReaderSettings {
   /// Page with the volume buttons (Android only).
   final bool volumePaging;
 
+  /// The CRT effect over the reader (off by default), and how strong.
+  final bool crt;
+  final double crtIntensity;
+
+  /// Set when this device could not keep up with the effect; it stays off
+  /// until the reader turns it on again.
+  final bool crtTooSlow;
+
   ReaderSettings copyWith({
     String? fontId,
     String? themeId,
@@ -53,6 +64,9 @@ class ReaderSettings {
     bool? showDebugOverlay,
     bool? keepAwake,
     bool? volumePaging,
+    bool? crt,
+    double? crtIntensity,
+    bool? crtTooSlow,
   }) => ReaderSettings(
     fontId: fontId ?? this.fontId,
     themeId: themeId ?? this.themeId,
@@ -60,6 +74,9 @@ class ReaderSettings {
     showDebugOverlay: showDebugOverlay ?? this.showDebugOverlay,
     keepAwake: keepAwake ?? this.keepAwake,
     volumePaging: volumePaging ?? this.volumePaging,
+    crt: crt ?? this.crt,
+    crtIntensity: crtIntensity ?? this.crtIntensity,
+    crtTooSlow: crtTooSlow ?? this.crtTooSlow,
   );
 }
 
@@ -69,6 +86,9 @@ const themeSettingKey = 'reader.theme';
 const orientationSettingKey = 'reader.orientation';
 const keepAwakeSettingKey = 'reader.keepAwake';
 const volumePagingSettingKey = 'reader.volumePaging';
+const crtSettingKey = 'reader.crt';
+const crtIntensitySettingKey = 'reader.crtIntensity';
+const crtTooSlowSettingKey = 'reader.crtTooSlow';
 const customThemesSettingKey = 'themes.custom';
 
 Future<void> _save(Ref ref, String key, String value) => ref
@@ -98,6 +118,9 @@ class ReaderSettingsNotifier extends Notifier<ReaderSettings> {
       final orientation = await db.setting(orientationSettingKey);
       final keepAwake = await db.setting(keepAwakeSettingKey);
       final volumePaging = await db.setting(volumePagingSettingKey);
+      final crt = await db.setting(crtSettingKey);
+      final crtIntensity = await db.setting(crtIntensitySettingKey);
+      final crtTooSlow = await db.setting(crtTooSlowSettingKey);
       // A choice made while restoring wins (null leaves a field alone).
       state = state.copyWith(
         fontId: state.fontId == null ? font : null,
@@ -107,6 +130,9 @@ class ReaderSettingsNotifier extends Notifier<ReaderSettings> {
             .firstOrNull,
         keepAwake: keepAwake == null ? null : keepAwake == 'true',
         volumePaging: volumePaging == null ? null : volumePaging == 'true',
+        crt: crt == null ? null : crt == 'true',
+        crtIntensity: double.tryParse(crtIntensity ?? '')?.clamp(0.0, 1.0),
+        crtTooSlow: crtTooSlow == null ? null : crtTooSlow == 'true',
       );
     } on Object catch (e) {
       developer.log('could not restore settings: $e', name: 'atdt.settings');
@@ -141,6 +167,26 @@ class ReaderSettingsNotifier extends Notifier<ReaderSettings> {
   void setVolumePaging(bool on) {
     state = state.copyWith(volumePaging: on);
     unawaited(_save(ref, volumePagingSettingKey, '$on'));
+  }
+
+  /// Turning the effect on also forgets an earlier "too slow" verdict, so
+  /// the reader can try again (after an OS update, say).
+  void setCrt(bool on) {
+    state = state.copyWith(crt: on, crtTooSlow: on ? false : null);
+    unawaited(_save(ref, crtSettingKey, '$on'));
+    if (on) unawaited(_save(ref, crtTooSlowSettingKey, 'false'));
+  }
+
+  void setCrtIntensity(double value) {
+    state = state.copyWith(crtIntensity: value.clamp(0.0, 1.0));
+    unawaited(_save(ref, crtIntensitySettingKey, '${state.crtIntensity}'));
+  }
+
+  /// The effect cost this device its frame rate: switch it off and say why.
+  void markCrtTooSlow() {
+    state = state.copyWith(crt: false, crtTooSlow: true);
+    unawaited(_save(ref, crtSettingKey, 'false'));
+    unawaited(_save(ref, crtTooSlowSettingKey, 'true'));
   }
 }
 

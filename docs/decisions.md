@@ -328,3 +328,23 @@ ferent`).
     - Sections are parsed when a phile loads. A first-character prefilter keeps the scan cheap, even for 71/7.
     - A **Sections** button appears in the chrome only when headings were found. It opens a sheet, indented by level, that marks and scrolls to the section being read.
     - Choosing a section puts its heading on the top line and hides the chrome, so nothing covers it.
+
+## 2026-10-17: CRT effect (Stage J)
+
+- **Checked:**
+  - The `dart:ui` sources in Flutter 3.47.7: accessibility flags, and `ImageFilter.shader`'s requirements.
+  - On the Android emulator, which renders with Impeller on OpenGL ES: the effect on the real archive, and the scroll perf test in profile mode, with and without the effect.
+- **Found:**
+  - **No reduce-transparency flag.** Flutter reports `disableAnimations` (Android's Remove animations, iOS Reduce Motion), `reduceMotion` (iOS only) and `highContrast` (iOS, Android 34+), but not Reduce Transparency. Android has no such setting.
+  - **`ImageFilter.shader` is Impeller-only** (`isShaderFilterSupported`), so it isn't available in `flutter test` or on Android devices that fall back to Skia.
+  - **The y-flip documentation is wrong for this version.** The docs say shaders must flip y on OpenGL ES. On this engine the documented `#ifdef IMPELLER_TARGET_OPENGLES` flip turned the reader **upside down**; without it the image is upright. **Not yet checked on a Vulkan phone or on iOS (Metal).**
+  - **The emulator can't judge 60 fps.** Its emulated GPU rasterises the plain reader at an average of 201 ms per frame in profile mode (130 of 135 frames over budget). The CRT pass ran afterwards, warmed up, and averaged 73 ms. Neither says anything about a phone.
+- **Changed:**
+  - **Shader** (`shaders/crt.frag`):
+    - Scanlines every 3 logical pixels (sized with the device pixel ratio), a four-tap bloom added on top of each pixel, and a pull toward the theme's foreground at each pixel's brightness. Each scaled by an intensity uniform.
+    - Every pixel keeps its own sample at its own coordinate, with no distortion or curvature, so no line can move.
+  - **Where it applies:** `ImageFiltered` wraps the reader only, never the chrome. It's off by default, with an intensity slider (default 60%), and all three settings persist.
+  - **Accessibility:** the effect stays off while Remove animations, Reduce Motion, high contrast or Reduce Transparency is on. Reduce Transparency is read from `UIAccessibility.isReduceTransparencyEnabled` over the `org.prouse.atdt/accessibility` channel, again when the app resumes. **That Swift code is not built or verified: it needs a Mac.**
+  - **Benchmark fallback:** no reference phone is available, so the "quick benchmark" runs on the device itself. In profile and release builds `FrameBudgetGuard` watches raster times while the effect is on. If more than a quarter of a 120-frame window misses the display's frame budget, it turns the effect off, says so in Settings and a snackbar, and remembers. Turning the effect on again clears that.
+  - **Settings** explain why the effect isn't showing: unavailable (no Impeller), paused (accessibility), or turned off (too slow).
+  - **The acceptance check needs a person:** 60 fps in profile mode with the effect on, on a mid-range phone. `integration_test/scroll_perf_test.dart` now writes `scroll_perf_crt.timeline_summary.json` next to the plain runs for that comparison.

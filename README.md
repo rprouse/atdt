@@ -30,8 +30,8 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 | F | Themes | Done |
 | G | Reader polish | Done |
 | H | Search | Done |
-| I | Section navigation | In review |
-| J | CRT effect | Not started |
+| I | Section navigation | Done |
+| J | CRT effect | In review; 60 fps check needs a physical device |
 | K | Release hardening | Not started |
 
 ## Requirements
@@ -119,13 +119,13 @@ flutter test integration_test/search_perf_test.dart -d <device>   # search < 300
 
 ### Scrolling performance
 
-This needs a physical device, because profile mode is not available on emulators:
+Profile builds run on an x86_64 emulator, but its emulated GPU makes frame times meaningless (the plain reader rasterises at about 5 fps there), so measure on a physical device:
 
 ```sh
 flutter drive --profile --no-dds   --driver=test_driver/perf_driver.dart   --target=integration_test/scroll_perf_test.dart -d <device>
 ```
 
-Timeline summaries are written to `build/scroll_perf_<font>.timeline_summary.json`.
+Timeline summaries are written to `build/scroll_perf_<font>.timeline_summary.json`, and `build/scroll_perf_crt.timeline_summary.json` for the default font with the CRT effect on (Stage J: 60 fps, so rasteriser times under 16.7 ms).
 
 ## Project layout
 
@@ -140,10 +140,11 @@ lib/
   storage/     drift database: issues, philes, text chunks, catalog, settings, search index
   download/    Download controller and archive screen
   library/     Issues (home and first launch), issue and search screens, search indexer
-  reader/      The reader widget, its scroll structure, chrome and debug overlay
+  reader/      The reader widget, its scroll structure, chrome, CRT effect and debug overlay
   settings/    Settings screen
 assets/
   fonts/       manifest.json, files/ (fonts) and licences/ (their licence texts)
+shaders/       crt.frag, the optional CRT fragment shader (Impeller only)
 test/
   fixtures/    Synthetic, byte-exact text fixtures
   archive/fixtures/   Synthetic issue tarball
