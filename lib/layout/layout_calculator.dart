@@ -81,6 +81,7 @@ class ReaderLayout {
     required this.devicePixelRatio,
     this.integerScale,
     this.usedFallback = false,
+    this.zoom = 1,
   });
 
   final double availableWidth;
@@ -93,6 +94,9 @@ class ReaderLayout {
 
   /// max(80, longest line).
   final int contentColumns;
+
+  /// Font size relative to fit, after integer-scale rounding (1 = fit).
+  final double zoom;
   final double devicePixelRatio;
 
   /// Whole-number scale for pixel fonts; null for vector fonts or fallback.
@@ -112,11 +116,18 @@ class ReaderLayout {
 ///
 /// Throws [ArgumentError] if the viewport leaves no room for text; callers
 /// should skip layout until the viewport has a real size.
+///
+/// [zoom] enlarges the text beyond fit (the spec's minimum is fit, so values
+/// below 1 count as 1). Vector fonts scale continuously; integer-scale fonts
+/// step to the nearest whole scale. A zoomed block is wider than the screen,
+/// so it starts at the left inset and scrolls horizontally.
 ReaderLayout computeLayout({
   required ViewportMetrics viewport,
   required MonoFontMetrics font,
   required int longestLineColumns,
+  double zoom = 1,
 }) {
+  zoom = math.max(1, zoom);
   font.validate();
   final available = viewport.availableWidth;
   final dpr = viewport.devicePixelRatio;
@@ -130,13 +141,15 @@ ReaderLayout computeLayout({
   if (font.integerScale) {
     final physicalWidth = available * dpr;
     final cellWidth = font.cellWidthPx!;
-    final scale = (physicalWidth / (fitColumns * cellWidth) + _epsilon).floor();
-    if (scale >= 1) {
+    final fitScale = (physicalWidth / (fitColumns * cellWidth) + _epsilon)
+        .floor();
+    if (fitScale >= 1) {
+      final scale = math.max(fitScale, (fitScale * zoom).round());
       final fontSize = scale * font.nativeSizePx! / dpr;
       final glyphAdvance = fontSize * font.advanceRatio;
-      // Centre the block, then snap its left edge to a device pixel so every
-      // glyph edge lands on the pixel grid.
-      final spare = physicalWidth - fitColumns * scale * cellWidth;
+      // Centre the block at fit, then snap its left edge to a device pixel
+      // so every glyph edge lands on the pixel grid.
+      final spare = math.max(0, physicalWidth - fitColumns * scale * cellWidth);
       final physicalLeft = (leftInset * dpr + spare / 2 + _epsilon)
           .floorToDouble();
       return ReaderLayout(
@@ -148,20 +161,22 @@ ReaderLayout computeLayout({
         contentColumns: contentColumns,
         devicePixelRatio: dpr,
         integerScale: scale,
+        zoom: scale / fitScale,
       );
     }
   }
 
-  final fitFontSize = available / (fitColumns * font.advanceRatio);
+  final fontSize = available / (fitColumns * font.advanceRatio) * zoom;
   return ReaderLayout(
     availableWidth: available,
-    fontSize: fitFontSize,
-    glyphAdvance: fitFontSize * font.advanceRatio,
-    lineHeight: _snapToPhysical(fitFontSize * font.lineHeightRatio, dpr),
+    fontSize: fontSize,
+    glyphAdvance: fontSize * font.advanceRatio,
+    lineHeight: _snapToPhysical(fontSize * font.lineHeightRatio, dpr),
     textLeft: leftInset,
     contentColumns: contentColumns,
     devicePixelRatio: dpr,
     usedFallback: font.integerScale,
+    zoom: zoom,
   );
 }
 

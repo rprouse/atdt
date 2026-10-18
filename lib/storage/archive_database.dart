@@ -12,6 +12,7 @@ import 'package:drift/drift.dart';
 
 import '../archive/issue_import.dart';
 import '../ingest/phile_text.dart' show TextEncoding;
+import '../layout/reading_position.dart';
 
 part 'archive_database.g.dart';
 
@@ -134,6 +135,30 @@ class CatalogIssues extends Table {
 
   @override
   Set<Column> get primaryKey => {number};
+}
+
+/// Where the reader last was, for "continue reading".
+class LastRead {
+  const LastRead({
+    required this.phileId,
+    required this.issue,
+    required this.number,
+    required this.title,
+    required this.topLine,
+    required this.lineCount,
+  });
+
+  final int phileId;
+  final int issue;
+  final int number;
+  final String title;
+  final int topLine;
+  final int lineCount;
+
+  /// How far through the phile, 0 to 100.
+  int get percent => lineCount <= 1
+      ? 100
+      : (100 * topLine / (lineCount - 1)).round().clamp(0, 100);
 }
 
 /// One row of the library's issue list.
@@ -307,6 +332,55 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
 
   Future<Phile?> phileById(int id) =>
       (select(philes)..where((p) => p.id.equals(id))).getSingleOrNull();
+
+  /// Saves where the reader is in a phile (one row per phile).
+  Future<void> saveReadingPosition(
+    int phileId,
+    ReadingPosition position, {
+    required DateTime at,
+  }) => into(readingStates).insertOnConflictUpdate(
+    ReadingStatesCompanion.insert(
+      phileId: Value(phileId),
+      topLineIndex: position.topLineIndex,
+      fractionIntoLine: position.fractionIntoLine,
+      columnOffset: position.columnOffset,
+      updatedAt: at,
+    ),
+  );
+
+  Future<ReadingPosition?> readingPosition(int phileId) async {
+    final row = await (select(
+      readingStates,
+    )..where((r) => r.phileId.equals(phileId))).getSingleOrNull();
+    return row == null
+        ? null
+        : ReadingPosition(
+            topLineIndex: row.topLineIndex,
+            fractionIntoLine: row.fractionIntoLine,
+            columnOffset: row.columnOffset,
+          );
+  }
+
+  /// The most recently read phile, for "continue reading".
+  Stream<LastRead?> watchLastRead() =>
+      customSelect(
+        'SELECT p.id, p.issue, p.number, p.title, p.line_count, '
+        'r.top_line_index FROM reading_state r '
+        'JOIN philes p ON p.id = r.phile_id '
+        'ORDER BY r.updated_at DESC LIMIT 1',
+        readsFrom: {readingStates, philes},
+      ).watchSingleOrNull().map(
+        (r) => r == null
+            ? null
+            : LastRead(
+                phileId: r.read<int>('id'),
+                issue: r.read<int>('issue'),
+                number: r.read<int>('number'),
+                title: r.read<String>('title'),
+                topLine: r.read<int>('top_line_index'),
+                lineCount: r.read<int>('line_count'),
+              ),
+      );
 
   Future<String?> setting(String key) async => (await (select(
     appSettings,

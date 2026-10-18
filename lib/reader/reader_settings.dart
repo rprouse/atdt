@@ -28,6 +28,8 @@ class ReaderSettings {
     this.themeId,
     this.orientation = OrientationMode.auto,
     this.showDebugOverlay = false,
+    this.keepAwake = true,
+    this.volumePaging = false,
   });
 
   /// Null means the manifest's default font.
@@ -38,22 +40,35 @@ class ReaderSettings {
   final OrientationMode orientation;
   final bool showDebugOverlay;
 
+  /// Keep the screen on while the reader is open.
+  final bool keepAwake;
+
+  /// Page with the volume buttons (Android only).
+  final bool volumePaging;
+
   ReaderSettings copyWith({
     String? fontId,
     String? themeId,
     OrientationMode? orientation,
     bool? showDebugOverlay,
+    bool? keepAwake,
+    bool? volumePaging,
   }) => ReaderSettings(
     fontId: fontId ?? this.fontId,
     themeId: themeId ?? this.themeId,
     orientation: orientation ?? this.orientation,
     showDebugOverlay: showDebugOverlay ?? this.showDebugOverlay,
+    keepAwake: keepAwake ?? this.keepAwake,
+    volumePaging: volumePaging ?? this.volumePaging,
   );
 }
 
 /// Keys of persisted choices in the database's settings table.
 const fontSettingKey = 'reader.font';
 const themeSettingKey = 'reader.theme';
+const orientationSettingKey = 'reader.orientation';
+const keepAwakeSettingKey = 'reader.keepAwake';
+const volumePagingSettingKey = 'reader.volumePaging';
 const customThemesSettingKey = 'themes.custom';
 
 Future<void> _save(Ref ref, String key, String value) => ref
@@ -74,17 +89,24 @@ class ReaderSettingsNotifier extends Notifier<ReaderSettings> {
     return const ReaderSettings();
   }
 
-  /// Font (Stage E) and theme (Stage F) persist across launches;
-  /// orientation follows in Stage G.
+  /// Every reader preference persists across launches.
   Future<void> _restore() async {
     try {
       final db = ref.read(archiveDatabaseProvider);
       final font = await db.setting(fontSettingKey);
       final theme = await db.setting(themeSettingKey);
-      // A choice made while restoring wins.
+      final orientation = await db.setting(orientationSettingKey);
+      final keepAwake = await db.setting(keepAwakeSettingKey);
+      final volumePaging = await db.setting(volumePagingSettingKey);
+      // A choice made while restoring wins (null leaves a field alone).
       state = state.copyWith(
         fontId: state.fontId == null ? font : null,
         themeId: state.themeId == null ? theme : null,
+        orientation: OrientationMode.values
+            .where((m) => m.name == orientation)
+            .firstOrNull,
+        keepAwake: keepAwake == null ? null : keepAwake == 'true',
+        volumePaging: volumePaging == null ? null : volumePaging == 'true',
       );
     } on Object catch (e) {
       developer.log('could not restore settings: $e', name: 'atdt.settings');
@@ -104,10 +126,21 @@ class ReaderSettingsNotifier extends Notifier<ReaderSettings> {
   void toggleDebugOverlay() =>
       state = state.copyWith(showDebugOverlay: !state.showDebugOverlay);
 
+  /// Applied by the reader while it is open (see ReaderScreen); the
+  /// library always rotates freely.
   void setOrientation(OrientationMode mode) {
     state = state.copyWith(orientation: mode);
-    // Works with the system rotation lock on, which is the point of it.
-    unawaited(SystemChrome.setPreferredOrientations(mode.orientations));
+    unawaited(_save(ref, orientationSettingKey, mode.name));
+  }
+
+  void setKeepAwake(bool on) {
+    state = state.copyWith(keepAwake: on);
+    unawaited(_save(ref, keepAwakeSettingKey, '$on'));
+  }
+
+  void setVolumePaging(bool on) {
+    state = state.copyWith(volumePaging: on);
+    unawaited(_save(ref, volumePagingSettingKey, '$on'));
   }
 }
 
