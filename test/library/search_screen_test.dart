@@ -1,7 +1,6 @@
 // Stage H: indexing, the search screen, and jumping to a match.
 import 'package:atdt/library/search_providers.dart';
 import 'package:atdt/library/search_screen.dart';
-import 'package:atdt/reader/reader_view.dart';
 import 'package:atdt/storage/archive_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -189,8 +188,6 @@ void main() {
       await tester.tap(find.byKey(ValueKey('hit-$id')));
       await tester.pumpAndSettle();
 
-      final state = tester.state<ReaderViewState>(find.byType(ReaderView));
-      final advance = state.layout!.glyphAdvance;
       final match = find
           .byWidgetPredicate(
             (w) =>
@@ -201,16 +198,26 @@ void main() {
       final paragraph = tester.renderObject<RenderParagraph>(
         find.descendant(of: match, matching: find.byType(RichText)),
       );
+      expect(_marked(paragraph.text), contains('shell'));
+
+      // The same text in the same style with no highlight. The engine may
+      // round glyph positions (it does on Linux), so compare against its
+      // own unmarked layout rather than i * advance.
       final text = paragraph.text.toPlainText();
-      final start = text.indexOf('shell');
-      // Every character, marked or not, sits on the 80-column grid.
-      for (final i in [0, start, start + 5, text.length - 1]) {
-        final box = paragraph
-            .getBoxesForSelection(
-              TextSelection(baseOffset: i, extentOffset: i + 1),
-            )
-            .single;
-        expect(box.left, closeTo(i * advance, 0.01), reason: 'column $i');
+      final plain = TextPainter(
+        text: TextSpan(text: text, style: paragraph.text.style),
+        textDirection: TextDirection.ltr,
+        textScaler: TextScaler.noScaling,
+      )..layout();
+      addTearDown(plain.dispose);
+      double left(List<TextBox> Function(TextSelection) boxes, int i) =>
+          boxes(TextSelection(baseOffset: i, extentOffset: i + 1)).single.left;
+      for (var i = 0; i < text.length; i++) {
+        expect(
+          left(paragraph.getBoxesForSelection, i),
+          closeTo(left(plain.getBoxesForSelection, i), 0.001),
+          reason: 'column $i',
+        );
       }
     });
   });
