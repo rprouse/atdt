@@ -12,6 +12,7 @@ import '../layout/reading_position.dart';
 import '../layout/text_block.dart';
 import '../library/library_providers.dart';
 import '../search/search_query.dart';
+import '../sections/section_parser.dart';
 import '../storage/archive_database.dart';
 import 'debug_overlay.dart';
 import 'reader_font.dart';
@@ -168,6 +169,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
+  /// From the jump list: the heading goes to the top line, and the chrome
+  /// hides so nothing covers it.
+  void _jumpTo(int line) {
+    _readerKey.currentState?.jumpToLine(line);
+    _setChromeVisible(false);
+  }
+
   void _onVerticalUserScroll(ScrollDirection direction) {
     // reverse: content moving up, i.e. reading further down.
     _setChromeVisible(direction == ScrollDirection.forward);
@@ -235,6 +243,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   title: title,
                   theme: theme,
                   diagnostics: _diagnostics,
+                  sections: phile.value?.sections ?? const [],
+                  onJump: _jumpTo,
                 ),
               ),
             ),
@@ -308,11 +318,30 @@ class _TopBar extends ConsumerWidget {
     required this.title,
     required this.theme,
     required this.diagnostics,
+    required this.sections,
+    required this.onJump,
   });
 
   final String title;
   final ReaderTheme theme;
   final ValueNotifier<ReaderDiagnostics?> diagnostics;
+  final List<Section> sections;
+  final ValueChanged<int> onJump;
+
+  Future<void> _showSections(BuildContext context) async {
+    final top = diagnostics.value?.position.topLineIndex ?? 0;
+    final line = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.background,
+      builder: (context) => _SectionsSheet(
+        sections: sections,
+        current: currentSection(sections, top),
+        theme: theme,
+      ),
+    );
+    if (line != null) onJump(line);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -348,6 +377,13 @@ class _TopBar extends ConsumerWidget {
                   style: TextStyle(color: theme.dim, fontSize: 14),
                 ),
               ),
+              if (sections.isNotEmpty)
+                IconButton(
+                  key: const ValueKey('sections'),
+                  tooltip: 'Sections',
+                  icon: const Icon(Icons.toc),
+                  onPressed: () => _showSections(context),
+                ),
               _Menu<String>(
                 tooltip: 'Font',
                 icon: Icons.text_fields,
@@ -384,6 +420,88 @@ class _TopBar extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SectionsSheet extends StatefulWidget {
+  const _SectionsSheet({
+    required this.sections,
+    required this.current,
+    required this.theme,
+  });
+
+  final List<Section> sections;
+  final int? current;
+  final ReaderTheme theme;
+
+  @override
+  State<_SectionsSheet> createState() => _SectionsSheetState();
+}
+
+class _SectionsSheetState extends State<_SectionsSheet> {
+  final _currentKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    // Long outlines (70/4 has 44 headings) open at the current section.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final current = _currentKey.currentContext;
+      if (current != null && current.mounted) {
+        Scrollable.ensureVisible(current, alignment: 0.3);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = widget.theme;
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      maxChildSize: 0.9,
+      builder: (context, controller) => ListView.builder(
+        key: const ValueKey('sections-list'),
+        controller: controller,
+        itemCount: widget.sections.length,
+        itemBuilder: (context, i) {
+          final s = widget.sections[i];
+          final current = i == widget.current;
+          final tile = ListTile(
+            key: ValueKey('section-${s.line}'),
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            minTileHeight: 40,
+            selected: current,
+            selectedTileColor: theme.selection,
+            contentPadding: EdgeInsets.only(
+              left: 16 + 20.0 * s.level,
+              right: 16,
+            ),
+            // One line per heading: outlines run to 40-odd entries.
+            title: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '${s.number}  ',
+                    style: TextStyle(color: current ? theme.accent : theme.dim),
+                  ),
+                  TextSpan(text: s.title),
+                ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15,
+                color: current ? theme.accent : theme.foreground,
+              ),
+            ),
+            onTap: () => Navigator.of(context).pop(s.line),
+          );
+          return current ? KeyedSubtree(key: _currentKey, child: tile) : tile;
+        },
       ),
     );
   }

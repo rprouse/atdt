@@ -29,8 +29,8 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 | E | Font system | Done |
 | F | Themes | Done |
 | G | Reader polish | Done |
-| H | Search | In review |
-| I | Section navigation | Not started |
+| H | Search | Done |
+| I | Section navigation | In review |
 | J | CRT effect | Not started |
 | K | Release hardening | Not started |
 
@@ -76,6 +76,8 @@ With those tarballs cached, a second tool imports the whole archive, builds the 
 
 ```sh
 dart run tool/search_bench.dart            # writes tool/out/search_bench.sqlite
+dart run tool/sections_report.dart         # jump-list coverage, refusals and the early-era check
+dart run tool/sections_report.dart 57/8    # ...plus the outline of one or more philes
 ```
 
 ### Adding a font
@@ -134,6 +136,7 @@ lib/
   fonts/       Pure Dart font manifest and cmap coverage (no Flutter imports)
   archive/     Pure Dart archive parsing and downloading (no Flutter imports)
   search/      Pure Dart query parsing and match highlighting (no Flutter imports)
+  sections/    Pure Dart section-heading parser for the jump list (no Flutter imports)
   storage/     drift database: issues, philes, text chunks, catalog, settings, search index
   download/    Download controller and archive screen
   library/     Issues (home and first launch), issue and search screens, search indexer
@@ -148,7 +151,7 @@ test/
   architecture_test.dart   Fails if a pure-Dart folder imports Flutter
 integration_test/   Device tests (rotation, position, orientation, storage, scroll and search performance)
 test_driver/   Driver for the performance test
-tool/          Developer scripts (fixtures, archive batch run, search benchmark, goldens)
+tool/          Developer scripts (fixtures, archive batch run, search benchmark, sections report, goldens)
 docs/          Spec, decisions log, spike report
 ```
 

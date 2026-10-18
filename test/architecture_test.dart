@@ -11,6 +11,7 @@ const _pureDartDirs = [
   'lib/fonts',
   'lib/themes',
   'lib/search',
+  'lib/sections',
 ];
 
 final _forbiddenImport = RegExp(

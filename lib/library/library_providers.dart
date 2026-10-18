@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../download/download_controller.dart';
 import '../ingest/phile_text.dart';
 import '../layout/reading_position.dart';
+import '../sections/section_parser.dart';
 import '../storage/archive_database.dart';
 
 /// Every known issue, newest first; updates as issues download.
@@ -15,13 +16,21 @@ final issuePhilesProvider = StreamProvider.family<List<Phile>, int>(
 );
 
 class StoredPhile {
-  const StoredPhile({required this.meta, required this.text, this.position});
+  const StoredPhile({
+    required this.meta,
+    required this.text,
+    this.position,
+    this.sections = const [],
+  });
 
   final Phile meta;
   final PhileText text;
 
   /// Where the reader left off, if they have opened it before.
   final ReadingPosition? position;
+
+  /// Headings for the jump list; empty when none were recognised.
+  final List<Section> sections;
 }
 
 /// A phile's text, loaded whole for the reader. Disposed when the reader
@@ -35,6 +44,7 @@ final storedPhileProvider = FutureProvider.autoDispose.family<StoredPhile, int>(
     return StoredPhile(
       meta: meta,
       position: await db.readingPosition(phileId),
+      sections: parseSections(lines),
       text: PhileText(
         lines: lines,
         longestLineColumns: meta.longestLine,
