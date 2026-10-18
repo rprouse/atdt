@@ -18,7 +18,7 @@ The app does **not** bundle any Phrack content. Text is fetched on-device from t
 
 ## Status
 
-Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/atdt-initial-spec.md).
+All stages are built; release needs the owner's device passes and store set-up (Stage K). The work was staged; see [`docs/atdt-initial-spec.md`](docs/atdt-initial-spec.md).
 
 | Stage | Name | Status |
 |---|---|---|
@@ -31,8 +31,8 @@ Early development. The work is staged; see [`docs/atdt-initial-spec.md`](docs/at
 | G | Reader polish | Done |
 | H | Search | Done |
 | I | Section navigation | Done |
-| J | CRT effect | In review; 60 fps check needs a physical device |
-| K | Release hardening | Not started |
+| J | CRT effect | Done |
+| K | Release hardening | In review; manual device passes and owner actions open ([test log](docs/test-log.md)) |
 
 ## Requirements
 
@@ -107,7 +107,7 @@ On Linux, `flutter test --update-goldens` works directly.
 
 ### Device tests
 
-Run each integration test file on its own; device runs do not handle several files at once.
+Run each integration test file on its own; device runs do not handle several files at once. CI runs the first four on an Android emulator and an iPhone simulator. Note that `flutter test integration_test` uninstalls the app afterwards on Android, taking a downloaded archive with it.
 
 ```sh
 flutter test integration_test/app_test.dart -d <device>
@@ -127,6 +127,18 @@ flutter drive --profile --no-dds   --driver=test_driver/perf_driver.dart   --tar
 
 Timeline summaries are written to `build/scroll_perf_<font>.timeline_summary.json`, and `build/scroll_perf_crt.timeline_summary.json` for the default font with the CRT effect on (Stage J: 60 fps, so rasteriser times under 16.7 ms).
 
+## Release builds
+
+```sh
+flutter build apk --release        # Android; flutter build appbundle for Play
+flutter build ios --release        # needs a Mac and Xcode
+```
+
+- **Android signing:** create an upload keystore, then `android/key.properties` (git-ignored) with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. Without it, release builds are signed with the debug key. They work locally and in CI, but can't be uploaded to a store.
+- **App icons** are drawn by `uv run tool/make_icon.py` into `assets/icon/` and turned into every platform size with `dart run flutter_launcher_icons`. That tool rewrites a boolean in `ios/Runner.xcodeproj/project.pbxproj` to `AppIcon`; revert that hunk afterwards.
+- **Privacy:** [`docs/privacy.md`](docs/privacy.md), shown in the app under Settings → Privacy (a test keeps the two identical).
+- **Manual device passes** are recorded in [`docs/test-log.md`](docs/test-log.md).
+
 ## Project layout
 
 ```
@@ -145,6 +157,7 @@ lib/
 assets/
   fonts/       manifest.json, files/ (fonts) and licences/ (their licence texts)
 shaders/       crt.frag, the optional CRT fragment shader (Impeller only)
+assets/icon/   App icon masters (generated; see Release builds)
 test/
   fixtures/    Synthetic, byte-exact text fixtures
   archive/fixtures/   Synthetic issue tarball
@@ -152,7 +165,7 @@ test/
   architecture_test.dart   Fails if a pure-Dart folder imports Flutter
 integration_test/   Device tests (rotation, position, orientation, storage, scroll and search performance)
 test_driver/   Driver for the performance test
-tool/          Developer scripts (fixtures, archive batch run, search benchmark, sections report, goldens)
+tool/          Developer scripts (fixtures, archive batch run, search benchmark, sections report, icon, goldens)
 docs/          Spec, decisions log, spike report
 ```
 
@@ -161,6 +174,8 @@ docs/          Spec, decisions log, spike report
 - [`docs/atdt-initial-spec.md`](docs/atdt-initial-spec.md): the product and staged build specification
 - [`docs/decisions.md`](docs/decisions.md): dated record of every verified assumption and design decision
 - [`docs/spike-report.md`](docs/spike-report.md): Stage A findings for the decision gate
+- [`docs/test-log.md`](docs/test-log.md): manual device passes (Stage K)
+- [`docs/privacy.md`](docs/privacy.md): the privacy statement
 - [`AGENTS.md`](AGENTS.md): instructions for coding agents working in this repository
 
 ## Licence
