@@ -8,6 +8,7 @@ import '../reader/reader_screen.dart' show isAndroid;
 import '../reader/reader_settings.dart';
 import '../reader/reader_theme.dart';
 import 'credits_screen.dart';
+import 'privacy_screen.dart';
 import 'theme_editor_screen.dart';
 
 /// Reader preferences: font, theme, orientation and reading behaviour.
@@ -143,6 +144,14 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: const Text('Phrack, and every font with its licence'),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const CreditsScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacy'),
+            subtitle: const Text('No data collected; what the app connects to'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const PrivacyScreen()),
             ),
           ),
           ListTile(
