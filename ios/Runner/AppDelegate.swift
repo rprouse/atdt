@@ -13,6 +13,26 @@ import UIKit
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     registerBackupExclusion(engineBridge.pluginRegistry)
+    registerAccessibility(engineBridge.pluginRegistry)
+  }
+
+  /// Settings Flutter does not report. The CRT effect stays off while Reduce
+  /// Transparency is on.
+  private func registerAccessibility(_ registry: FlutterPluginRegistry) {
+    guard let registrar = registry.registrar(forPlugin: "AtdtAccessibility") else {
+      return
+    }
+    let channel = FlutterMethodChannel(
+      name: "org.prouse.atdt/accessibility",
+      binaryMessenger: registrar.messenger()
+    )
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "reduceTransparency" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      result(UIAccessibility.isReduceTransparencyEnabled)
+    }
   }
 
   /// The downloaded archive can be fetched again, so it stays out of iCloud

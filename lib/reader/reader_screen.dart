@@ -14,6 +14,7 @@ import '../library/library_providers.dart';
 import '../search/search_query.dart';
 import '../sections/section_parser.dart';
 import '../storage/archive_database.dart';
+import 'crt_effect.dart';
 import 'debug_overlay.dart';
 import 'reader_font.dart';
 import 'reader_settings.dart';
@@ -227,7 +228,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          Positioned.fill(child: body),
+          // The CRT effect covers the text only; the chrome stays crisp.
+          Positioned.fill(
+            child: CrtEffect(tint: theme.foreground, child: body),
+          ),
           Positioned(
             top: 0,
             left: 0,

@@ -69,3 +69,7 @@ flutter:
     - assets/fonts/manifest.json
     - assets/fonts/files/
     - assets/fonts/licences/
+
+  # The optional CRT effect over the reader (Stage J).
+  shaders:
+    - shaders/crt.frag

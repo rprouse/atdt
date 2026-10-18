@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../reader/about.dart';
+import '../reader/crt_effect.dart';
 import '../reader/reader_font.dart';
 import '../reader/reader_screen.dart' show isAndroid;
 import '../reader/reader_settings.dart';
@@ -126,6 +127,8 @@ class SettingsScreen extends ConsumerWidget {
               value: settings.volumePaging,
               onChanged: notifier.setVolumePaging,
             ),
+          section('Effects'),
+          ..._crtSettings(context, ref, settings),
           section('Developer'),
           SwitchListTile(
             title: const Text('Layout debug overlay'),
@@ -152,6 +155,54 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+List<Widget> _crtSettings(
+  BuildContext context,
+  WidgetRef ref,
+  ReaderSettings settings,
+) {
+  final notifier = ref.read(readerSettingsProvider.notifier);
+  final program = ref.watch(crtProgramProvider);
+  final supported = program.value != null;
+  final block = crtBlock(
+    settings: settings,
+    supported: supported || program.isLoading,
+    accessibility: crtAccessibilityBlocks(
+      context,
+      reduceTransparency: ref.watch(reduceTransparencyProvider),
+    ),
+  );
+  final unavailable = !supported && !program.isLoading;
+  final subtitle = unavailable
+      ? 'Not available on this device'
+      : switch (block) {
+          CrtBlock.tooSlow =>
+            'Turned off: this device could not keep up with it',
+          CrtBlock.accessibility =>
+            'Paused while reduced motion, reduced transparency or high '
+                'contrast is on',
+          _ => 'Scanlines, glow and a phosphor tint over the text',
+        };
+  return [
+    SwitchListTile(
+      key: const ValueKey('crt'),
+      title: const Text('CRT effect'),
+      subtitle: Text(subtitle),
+      value: settings.crt,
+      onChanged: supported ? notifier.setCrt : null,
+    ),
+    ListTile(
+      title: const Text('Intensity'),
+      subtitle: Slider(
+        key: const ValueKey('crt-intensity'),
+        value: settings.crtIntensity,
+        divisions: 10,
+        label: '${(settings.crtIntensity * 100).round()}%',
+        onChanged: settings.crt && supported ? notifier.setCrtIntensity : null,
+      ),
+    ),
+  ];
 }
 
 void _openEditor(
