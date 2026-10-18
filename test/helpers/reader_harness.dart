@@ -5,6 +5,7 @@ import 'package:atdt/fonts/font_manifest.dart';
 import 'package:atdt/ingest/phile_text.dart';
 import 'package:atdt/reader/reader_font.dart';
 import 'package:atdt/reader/reader_view.dart';
+import 'package:atdt/search/search_query.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -68,11 +69,20 @@ Widget readerApp({
   Color background = const Color(0xFF0A120A),
   Color foreground = const Color(0xFF41FF63),
   GlobalKey<ReaderViewState>? key,
+  SearchQuery? highlight,
+  Color? selection,
 }) => MaterialApp(
   debugShowCheckedModeBanner: false,
   home: ColoredBox(
     color: background,
-    child: ReaderView(key: key, text: text, font: font, foreground: foreground),
+    child: ReaderView(
+      key: key,
+      text: text,
+      font: font,
+      foreground: foreground,
+      highlight: highlight,
+      selectionColor: selection,
+    ),
   ),
 );
 

@@ -36,6 +36,12 @@ ImportedIssue _issueFromFixture(int number, String fixture) => ImportedIssue(
 
 final _fetched = DateTime.utc(2026, 10, 16);
 
+Future<void> _dropSearchTables(ArchiveDatabase db) async {
+  for (final table in ['search_indexed', 'line_fts', 'title_fts']) {
+    await db.customStatement('DROP TABLE $table');
+  }
+}
+
 void main() {
   late ArchiveDatabase db;
   tearDown(() => db.close());
@@ -191,10 +197,11 @@ void main() {
       });
       final file = File('${dir.path}/archive.sqlite');
 
-      // Build a v1 database: today's schema without the catalog.
+      // Build a v1 database: today's schema without the catalog or search.
       final v1 = ArchiveDatabase(NativeDatabase(file));
       await v1.saveIssue(_fixtureIssue(), fetchedAt: _fetched);
       await v1.customStatement('DROP TABLE catalog');
+      await _dropSearchTables(v1);
       await v1.customStatement('PRAGMA user_version = 1');
       await v1.close();
 
@@ -208,6 +215,27 @@ void main() {
       expect(await db.readAllLines((await db.phile(99, 1))!.id), hasLength(3));
     },
   );
+
+  test('upgrading a v2 database adds search and queues every phile', () async {
+    final dir = Directory.systemTemp.createTempSync('atdt_migration');
+    addTearDown(() async {
+      await db.close();
+      dir.deleteSync(recursive: true);
+    });
+    final file = File('${dir.path}/archive.sqlite');
+
+    final v2 = ArchiveDatabase(NativeDatabase(file));
+    await v2.saveIssue(_fixtureIssue(), fetchedAt: _fetched);
+    await _dropSearchTables(v2);
+    await v2.customStatement('PRAGMA user_version = 2');
+    await v2.close();
+
+    db = ArchiveDatabase(NativeDatabase(file));
+    expect(await db.unindexedPhileIds(), hasLength(3));
+    final id = (await db.phile(99, 1))!.id;
+    await db.indexPhile(id, await db.readAllLines(id));
+    expect(await db.unindexedPhileIds(), hasLength(2));
+  });
 
   test('settings round-trip and overwrite', () async {
     db = _memoryDb();

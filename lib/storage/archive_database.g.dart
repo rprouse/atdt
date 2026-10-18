@@ -2090,6 +2090,152 @@ class CatalogIssuesCompanion extends UpdateCompanion<CatalogIssue> {
   }
 }
 
+class $SearchIndexedTable extends SearchIndexed
+    with TableInfo<$SearchIndexedTable, SearchIndexedData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SearchIndexedTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _phileIdMeta = const VerificationMeta(
+    'phileId',
+  );
+  @override
+  late final GeneratedColumn<int> phileId = GeneratedColumn<int>(
+    'phile_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES philes (id) ON DELETE CASCADE',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [phileId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'search_indexed';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SearchIndexedData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('phile_id')) {
+      context.handle(
+        _phileIdMeta,
+        phileId.isAcceptableOrUnknown(data['phile_id']!, _phileIdMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {phileId};
+  @override
+  SearchIndexedData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SearchIndexedData(
+      phileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}phile_id'],
+      )!,
+    );
+  }
+
+  @override
+  $SearchIndexedTable createAlias(String alias) {
+    return $SearchIndexedTable(attachedDatabase, alias);
+  }
+}
+
+class SearchIndexedData extends DataClass
+    implements Insertable<SearchIndexedData> {
+  final int phileId;
+  const SearchIndexedData({required this.phileId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['phile_id'] = Variable<int>(phileId);
+    return map;
+  }
+
+  SearchIndexedCompanion toCompanion(bool nullToAbsent) {
+    return SearchIndexedCompanion(phileId: Value(phileId));
+  }
+
+  factory SearchIndexedData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SearchIndexedData(
+      phileId: serializer.fromJson<int>(json['phileId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{'phileId': serializer.toJson<int>(phileId)};
+  }
+
+  SearchIndexedData copyWith({int? phileId}) =>
+      SearchIndexedData(phileId: phileId ?? this.phileId);
+  SearchIndexedData copyWithCompanion(SearchIndexedCompanion data) {
+    return SearchIndexedData(
+      phileId: data.phileId.present ? data.phileId.value : this.phileId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchIndexedData(')
+          ..write('phileId: $phileId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => phileId.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SearchIndexedData && other.phileId == this.phileId);
+}
+
+class SearchIndexedCompanion extends UpdateCompanion<SearchIndexedData> {
+  final Value<int> phileId;
+  const SearchIndexedCompanion({this.phileId = const Value.absent()});
+  SearchIndexedCompanion.insert({this.phileId = const Value.absent()});
+  static Insertable<SearchIndexedData> custom({Expression<int>? phileId}) {
+    return RawValuesInsertable({if (phileId != null) 'phile_id': phileId});
+  }
+
+  SearchIndexedCompanion copyWith({Value<int>? phileId}) {
+    return SearchIndexedCompanion(phileId: phileId ?? this.phileId);
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (phileId.present) {
+      map['phile_id'] = Variable<int>(phileId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchIndexedCompanion(')
+          ..write('phileId: $phileId')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$ArchiveDatabase extends GeneratedDatabase {
   _$ArchiveDatabase(QueryExecutor e) : super(e);
   $ArchiveDatabaseManager get managers => $ArchiveDatabaseManager(this);
@@ -2101,6 +2247,7 @@ abstract class _$ArchiveDatabase extends GeneratedDatabase {
   late final $ReadingStatesTable readingStates = $ReadingStatesTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final $CatalogIssuesTable catalogIssues = $CatalogIssuesTable(this);
+  late final $SearchIndexedTable searchIndexed = $SearchIndexedTable(this);
   late final Index phileTextByLine = Index(
     'phile_text_by_line',
     'CREATE INDEX phile_text_by_line ON phile_text (phile_id, first_line)',
@@ -2116,6 +2263,7 @@ abstract class _$ArchiveDatabase extends GeneratedDatabase {
     readingStates,
     appSettings,
     catalogIssues,
+    searchIndexed,
     phileTextByLine,
   ];
   @override
@@ -2140,6 +2288,13 @@ abstract class _$ArchiveDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('reading_state', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'philes',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('search_indexed', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -2518,6 +2673,25 @@ final class $$PhilesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$SearchIndexedTable, List<SearchIndexedData>>
+  _searchIndexedRefsTable(_$ArchiveDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.searchIndexed,
+        aliasName: 'philes__id__search_indexed__phile_id',
+      );
+
+  $$SearchIndexedTableProcessedTableManager get searchIndexedRefs {
+    final manager = $$SearchIndexedTableTableManager(
+      $_db,
+      $_db.searchIndexed,
+    ).filter((f) => f.phileId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_searchIndexedRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$PhilesTableFilterComposer
@@ -2633,6 +2807,31 @@ class $$PhilesTableFilterComposer
           }) => $$ReadingStatesTableFilterComposer(
             $db: $db,
             $table: $db.readingStates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> searchIndexedRefs(
+    Expression<bool> Function($$SearchIndexedTableFilterComposer f) f,
+  ) {
+    final $$SearchIndexedTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.searchIndexed,
+      getReferencedColumn: (t) => t.phileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SearchIndexedTableFilterComposer(
+            $db: $db,
+            $table: $db.searchIndexed,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2823,6 +3022,31 @@ class $$PhilesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> searchIndexedRefs<T extends Object>(
+    Expression<T> Function($$SearchIndexedTableAnnotationComposer a) f,
+  ) {
+    final $$SearchIndexedTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.searchIndexed,
+      getReferencedColumn: (t) => t.phileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SearchIndexedTableAnnotationComposer(
+            $db: $db,
+            $table: $db.searchIndexed,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PhilesTableTableManager
@@ -2842,6 +3066,7 @@ class $$PhilesTableTableManager
             bool issue,
             bool phileTextChunksRefs,
             bool readingStatesRefs,
+            bool searchIndexedRefs,
           })
         > {
   $$PhilesTableTableManager(_$ArchiveDatabase db, $PhilesTable table)
@@ -2912,12 +3137,14 @@ class $$PhilesTableTableManager
                 issue = false,
                 phileTextChunksRefs = false,
                 readingStatesRefs = false,
+                searchIndexedRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (phileTextChunksRefs) db.phileTextChunks,
                     if (readingStatesRefs) db.readingStates,
+                    if (searchIndexedRefs) db.searchIndexed,
                   ],
                   addJoins:
                       <
@@ -2993,6 +3220,27 @@ class $$PhilesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (searchIndexedRefs)
+                        await $_getPrefetchedData<
+                          Phile,
+                          $PhilesTable,
+                          SearchIndexedData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PhilesTableReferences
+                              ._searchIndexedRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PhilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).searchIndexedRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.phileId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -3017,6 +3265,7 @@ typedef $$PhilesTableProcessedTableManager =
         bool issue,
         bool phileTextChunksRefs,
         bool readingStatesRefs,
+        bool searchIndexedRefs,
       })
     >;
 typedef $$PhileTextChunksTableCreateCompanionBuilder =
@@ -3968,6 +4217,240 @@ typedef $$CatalogIssuesTableProcessedTableManager =
       CatalogIssue,
       PrefetchHooks Function()
     >;
+typedef $$SearchIndexedTableCreateCompanionBuilder =
+    SearchIndexedCompanion Function({Value<int> phileId});
+typedef $$SearchIndexedTableUpdateCompanionBuilder =
+    SearchIndexedCompanion Function({Value<int> phileId});
+
+final class $$SearchIndexedTableReferences
+    extends
+        BaseReferences<
+          _$ArchiveDatabase,
+          $SearchIndexedTable,
+          SearchIndexedData
+        > {
+  $$SearchIndexedTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $PhilesTable _phileIdTable(_$ArchiveDatabase db) =>
+      db.philes.createAlias('search_indexed__phile_id__philes__id');
+
+  $$PhilesTableProcessedTableManager get phileId {
+    final $_column = $_itemColumn<int>('phile_id')!;
+
+    final manager = $$PhilesTableTableManager(
+      $_db,
+      $_db.philes,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_phileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$SearchIndexedTableFilterComposer
+    extends Composer<_$ArchiveDatabase, $SearchIndexedTable> {
+  $$SearchIndexedTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  $$PhilesTableFilterComposer get phileId {
+    final $$PhilesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.phileId,
+      referencedTable: $db.philes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhilesTableFilterComposer(
+            $db: $db,
+            $table: $db.philes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SearchIndexedTableOrderingComposer
+    extends Composer<_$ArchiveDatabase, $SearchIndexedTable> {
+  $$SearchIndexedTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  $$PhilesTableOrderingComposer get phileId {
+    final $$PhilesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.phileId,
+      referencedTable: $db.philes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhilesTableOrderingComposer(
+            $db: $db,
+            $table: $db.philes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SearchIndexedTableAnnotationComposer
+    extends Composer<_$ArchiveDatabase, $SearchIndexedTable> {
+  $$SearchIndexedTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  $$PhilesTableAnnotationComposer get phileId {
+    final $$PhilesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.phileId,
+      referencedTable: $db.philes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhilesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.philes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SearchIndexedTableTableManager
+    extends
+        RootTableManager<
+          _$ArchiveDatabase,
+          $SearchIndexedTable,
+          SearchIndexedData,
+          $$SearchIndexedTableFilterComposer,
+          $$SearchIndexedTableOrderingComposer,
+          $$SearchIndexedTableAnnotationComposer,
+          $$SearchIndexedTableCreateCompanionBuilder,
+          $$SearchIndexedTableUpdateCompanionBuilder,
+          (SearchIndexedData, $$SearchIndexedTableReferences),
+          SearchIndexedData,
+          PrefetchHooks Function({bool phileId})
+        > {
+  $$SearchIndexedTableTableManager(
+    _$ArchiveDatabase db,
+    $SearchIndexedTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SearchIndexedTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SearchIndexedTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SearchIndexedTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> phileId = const Value.absent(),
+          }) => SearchIndexedCompanion(phileId: phileId),
+          createCompanionCallback: ({
+            Value<int> phileId = const Value.absent(),
+          }) => SearchIndexedCompanion.insert(phileId: phileId),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SearchIndexedTable, SearchIndexedData>(table),
+                  $$SearchIndexedTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({phileId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (phileId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.phileId,
+                        referencedTable: $$SearchIndexedTableReferences
+                            ._phileIdTable(db),
+                        referencedColumn: $$SearchIndexedTableReferences
+                            ._phileIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SearchIndexedTableProcessedTableManager =
+    ProcessedTableManager<
+      _$ArchiveDatabase,
+      $SearchIndexedTable,
+      SearchIndexedData,
+      $$SearchIndexedTableFilterComposer,
+      $$SearchIndexedTableOrderingComposer,
+      $$SearchIndexedTableAnnotationComposer,
+      $$SearchIndexedTableCreateCompanionBuilder,
+      $$SearchIndexedTableUpdateCompanionBuilder,
+      (SearchIndexedData, $$SearchIndexedTableReferences),
+      SearchIndexedData,
+      PrefetchHooks Function({bool phileId})
+    >;
 
 class $ArchiveDatabaseManager {
   final _$ArchiveDatabase _db;
@@ -3984,4 +4467,6 @@ class $ArchiveDatabaseManager {
       $$AppSettingsTableTableManager(_db, _db.appSettings);
   $$CatalogIssuesTableTableManager get catalogIssues =>
       $$CatalogIssuesTableTableManager(_db, _db.catalogIssues);
+  $$SearchIndexedTableTableManager get searchIndexed =>
+      $$SearchIndexedTableTableManager(_db, _db.searchIndexed);
 }

@@ -9,6 +9,7 @@ import '../settings/settings_screen.dart';
 import '../storage/archive_database.dart';
 import 'issue_screen.dart';
 import 'library_providers.dart';
+import 'search_screen.dart';
 
 /// Home: every issue, newest first. With nothing stored it is the
 /// first-launch flow: it explains the download and starts it on request.
@@ -25,6 +26,13 @@ class IssuesScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Phrack'),
         actions: [
+          if (issues.value?.any((i) => i.downloaded) ?? false)
+            IconButton(
+              key: const ValueKey('open-search'),
+              tooltip: 'Search',
+              icon: const Icon(Icons.search),
+              onPressed: () => _push(context, const SearchScreen()),
+            ),
           IconButton(
             tooltip: 'Archive',
             icon: const Icon(Icons.cloud_download_outlined),

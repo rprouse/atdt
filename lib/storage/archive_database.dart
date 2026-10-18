@@ -137,6 +137,61 @@ class CatalogIssues extends Table {
   Set<Column> get primaryKey => {number};
 }
 
+/// Philes whose text is in the search index (schema v3). The FTS tables
+/// themselves are virtual and created by SQL; see [ArchiveDatabase].
+class SearchIndexed extends Table {
+  @override
+  String get tableName => 'search_indexed';
+
+  IntColumn get phileId =>
+      integer().references(Philes, #id, onDelete: KeyAction.cascade)();
+
+  @override
+  Set<Column> get primaryKey => {phileId};
+}
+
+/// How much of the archive search covers.
+class SearchIndexStatus {
+  const SearchIndexStatus({required this.indexed, required this.total});
+
+  final int indexed;
+  final int total;
+
+  bool get complete => indexed >= total;
+}
+
+/// One phile a search found.
+class SearchHit {
+  const SearchHit({
+    required this.phileId,
+    required this.issue,
+    required this.number,
+    required this.title,
+    this.author,
+    this.line,
+    this.matchingLines = 0,
+  });
+
+  final int phileId;
+  final int issue;
+  final int number;
+  final String title;
+  final String? author;
+
+  /// The first matching line; null for a title or author match.
+  final int? line;
+  final int matchingLines;
+}
+
+/// Bits of an FTS rowid that hold the line number: rowid is
+/// `phileId << searchLineBits | line`, so a match is already a phile and a
+/// line, and grouping by phile needs no text. 2^24 lines is 60 times the
+/// largest phile (71/7, 265,732 lines).
+const int searchLineBits = 24;
+const int _searchLineMask = (1 << searchLineBits) - 1;
+
+int searchRowId(int phileId, int line) => phileId << searchLineBits | line;
+
 /// Where the reader last was, for "continue reading".
 class LastRead {
   const LastRead({
@@ -186,6 +241,7 @@ class LibraryIssue {
     ReadingStates,
     AppSettings,
     CatalogIssues,
+    SearchIndexed,
   ],
 )
 class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
@@ -205,18 +261,51 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
   final int decodeOnIsolateAbove;
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) async {
+      await m.createAll();
+      await _createSearchTables();
+    },
     onUpgrade: (m, from, to) async {
       // v2 adds the catalog of available issues.
       if (from < 2) await m.createTable(catalogIssues);
+      // v3 adds search; the indexer then indexes every stored phile.
+      if (from < 3) {
+        await m.createTable(searchIndexed);
+        await _createSearchTables();
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },
   );
+
+  /// Search runs on two FTS5 tables.
+  ///
+  /// `line_fts` has one row per non-blank line. It is contentless: the text
+  /// is already in `phile_text`, and a second copy would double the
+  /// database. Queries return rowids only, which is all search needs;
+  /// snippets are read back with [readLine]. `columnsize = 0` drops the
+  /// per-row size table, which only ranking uses: 15 MB of the archive's
+  /// 67 MB index. It rules out `contentless_delete`, so a re-imported
+  /// phile's old rows stay behind; every search joins on `philes`, and
+  /// AUTOINCREMENT never reuses an id, so they can never match.
+  ///
+  /// `title_fts` holds each phile's title and author (rowid = phile id) for
+  /// the titles-and-authors filter.
+  Future<void> _createSearchTables() async {
+    const tokenizer = "tokenize = 'unicode61 remove_diacritics 2'";
+    await customStatement(
+      'CREATE VIRTUAL TABLE line_fts USING fts5('
+      "text, content = '', columnsize = 0, $tokenizer)",
+    );
+    await customStatement(
+      'CREATE VIRTUAL TABLE title_fts USING fts5(title, author, $tokenizer)',
+    );
+  }
 
   @override
   Future<Set<int>> storedIssueNumbers() async {
@@ -230,7 +319,18 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
     required DateTime fetchedAt,
     DateTime? releaseDate,
   }) => transaction(() async {
-    // Replace any earlier copy (e.g. a re-import after an update).
+    // Replace any earlier copy (e.g. a re-import after an update). The FTS
+    // tables have no foreign keys; old titles are removed here, and old
+    // lines are orphaned (see _createSearchTables).
+    final old =
+        await (selectOnly(philes)
+              ..addColumns([philes.id])
+              ..where(philes.issue.equals(issue.number)))
+            .map((r) => r.read(philes.id)!)
+            .get();
+    for (final id in old) {
+      await customStatement('DELETE FROM title_fts WHERE rowid = ?', [id]);
+    }
     await (delete(issues)..where((i) => i.number.equals(issue.number))).go();
     await into(issues).insert(
       IssuesCompanion.insert(
@@ -413,6 +513,112 @@ class ArchiveDatabase extends _$ArchiveDatabase implements ArchiveStore {
     if (line >= first + row.read<int>('line_count')) return null;
     return _lineInChunk(row.read<Uint8List>('data'), line - first);
   }
+
+  /// Puts a phile's lines, title and author in the search index. Does
+  /// nothing if it is already there: contentless rows cannot be replaced.
+  Future<void> indexPhile(int phileId, List<String> lines) =>
+      transaction(() async {
+        final meta = await phileById(phileId);
+        if (meta == null) return; // Deleted (re-imported) since it was queued.
+        final done = await (select(
+          searchIndexed,
+        )..where((s) => s.phileId.equals(phileId))).getSingleOrNull();
+        if (done != null) return;
+        await batch((b) {
+          for (var i = 0; i < lines.length && i <= _searchLineMask; i++) {
+            // Blank lines hold no tokens; skipping them saves a row each.
+            if (lines[i].trim().isEmpty) continue;
+            b.customStatement(
+              'INSERT INTO line_fts(rowid, text) VALUES (?, ?)',
+              [searchRowId(phileId, i), lines[i]],
+            );
+          }
+          b.customStatement(
+            'INSERT INTO title_fts(rowid, title, author) VALUES (?, ?, ?)',
+            [phileId, meta.title, meta.author],
+          );
+          b.insert(
+            searchIndexed,
+            SearchIndexedCompanion.insert(phileId: Value(phileId)),
+          );
+        });
+      });
+
+  /// Stored philes not yet in the search index, newest issue first.
+  Future<List<int>> unindexedPhileIds() => customSelect(
+    'SELECT id FROM philes '
+    'WHERE id NOT IN (SELECT phile_id FROM search_indexed) '
+    'ORDER BY issue DESC, number',
+    readsFrom: {philes, searchIndexed},
+  ).map((r) => r.read<int>('id')).get();
+
+  Stream<SearchIndexStatus> watchSearchIndexStatus() =>
+      customSelect(
+        'SELECT (SELECT count(*) FROM search_indexed) AS indexed, '
+        '(SELECT count(*) FROM philes) AS total',
+        readsFrom: {philes, searchIndexed},
+      ).watchSingle().map(
+        (r) => SearchIndexStatus(
+          indexed: r.read<int>('indexed'),
+          total: r.read<int>('total'),
+        ),
+      );
+
+  /// Philes matching [match] (an FTS5 expression, from
+  /// `SearchQuery.toMatchExpression`), newest issue first.
+  ///
+  /// Line search groups matching lines by phile from their rowids alone,
+  /// so it never reads text. [titlesOnly] searches titles and authors.
+  Future<List<SearchHit>> search(
+    String match, {
+    int fromIssue = 0,
+    int toIssue = 1 << 30,
+    bool titlesOnly = false,
+  }) async {
+    final range = [Variable.withInt(fromIssue), Variable.withInt(toIssue)];
+    if (titlesOnly) {
+      final rows = await customSelect(
+        'SELECT p.id, p.issue, p.number, p.title, p.author '
+        'FROM title_fts t JOIN philes p ON p.id = t.rowid '
+        'WHERE title_fts MATCH ? AND p.issue BETWEEN ? AND ? '
+        'ORDER BY p.issue DESC, p.number',
+        variables: [Variable.withString(match), ...range],
+        readsFrom: {philes},
+      ).get();
+      return [for (final r in rows) _hit(r)];
+    }
+    final rows = await customSelect(
+      'SELECT p.id, p.issue, p.number, p.title, p.author, '
+      'g.first_line, g.hits FROM ('
+      '  SELECT rowid >> $searchLineBits AS phile_id, '
+      '  min(rowid) & $_searchLineMask AS first_line, count(*) AS hits '
+      '  FROM line_fts WHERE line_fts MATCH ? '
+      '  GROUP BY rowid >> $searchLineBits'
+      ') g JOIN philes p ON p.id = g.phile_id '
+      'WHERE p.issue BETWEEN ? AND ? '
+      'ORDER BY p.issue DESC, p.number',
+      variables: [Variable.withString(match), ...range],
+      readsFrom: {philes},
+    ).get();
+    return [
+      for (final r in rows)
+        _hit(
+          r,
+          line: r.read<int>('first_line'),
+          matchingLines: r.read<int>('hits'),
+        ),
+    ];
+  }
+
+  SearchHit _hit(QueryRow r, {int? line, int matchingLines = 0}) => SearchHit(
+    phileId: r.read<int>('id'),
+    issue: r.read<int>('issue'),
+    number: r.read<int>('number'),
+    title: r.read<String>('title'),
+    author: r.readNullable<String>('author'),
+    line: line,
+    matchingLines: matchingLines,
+  );
 
   /// Every line of a phile, for the reader.
   ///

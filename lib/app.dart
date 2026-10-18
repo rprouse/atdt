@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'download/download_controller.dart';
 import 'library/issues_screen.dart';
+import 'library/search_providers.dart';
 import 'reader/reader_settings.dart';
 
 class AtdtApp extends ConsumerStatefulWidget {
@@ -20,6 +21,9 @@ class _AtdtAppState extends ConsumerState<AtdtApp> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_resume()));
+    // The search index follows the archive for the app's whole life; listen
+    // rather than watch, so progress never rebuilds the app.
+    ref.listenManual(searchIndexerProvider, (_, _) {});
   }
 
   /// Picks up a download the app was killed during.

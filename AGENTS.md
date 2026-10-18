@@ -10,7 +10,7 @@ ATDT is a Flutter (Dart) app for iOS and Android that reads the Phrack archive a
 
 1. **Never commit or bundle Phrack text.** The app downloads it on the device; no asset declaration may include it. Tests use synthetic fixtures in `test/fixtures/` that you write yourself; device tests generate text in code.
 2. **Never reflow or rewrap text.** Every line renders on exactly one visual row. `softWrap: false`, `maxLines: 1`, `overflow: TextOverflow.visible`.
-3. **Pure Dart cores.** Layout maths (`lib/layout/`), ingestion (`lib/ingest/`) archive parsing and downloading (`lib/archive/`) and the font manifest and coverage (`lib/fonts/`) must not import `package:flutter`. Keep them unit-testable with plain `dart test` semantics. Storage (`lib/storage/`) is pure drift except `database_file.dart`, which opens the file on a device.
+3. **Pure Dart cores.** Layout maths (`lib/layout/`), ingestion (`lib/ingest/`), archive parsing and downloading (`lib/archive/`), the font manifest and coverage (`lib/fonts/`) and search query parsing (`lib/search/`) must not import `package:flutter`. Keep them unit-testable with plain `dart test` semantics. Storage (`lib/storage/`) is pure drift except `database_file.dart`, which opens the file on a device.
 4. **Position is a tuple, never pixels.** Reading position is `(topLineIndex, fractionIntoLine, columnOffset)`. Restore from it after every metrics change.
 5. **Chrome is an overlay.** Showing or hiding chrome must never move a line of text.
 6. **Ligatures off on every font:** `FontFeature.disable('liga')` and `FontFeature.disable('calt')`.

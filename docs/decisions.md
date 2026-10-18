@@ -262,3 +262,37 @@ ferent`).
   - **Reading position** is saved 500 ms after scrolling stops, when the reader closes, and when the app becomes inactive. "Continue reading" shows the most recently saved phile; its percentage is based on the top line. A phile that is opened but never scrolled is not recorded.
   - **Keep-awake** (`wakelock_plus`) is on by default while a reader is open, and released on exit.
   - `android/gradle.properties` sets `kotlin.incremental=false`.
+
+## 2026-10-17: Search (Stage H)
+
+- **Checked:** `tool/search_bench.dart` builds the index over the real archive (72 issues, 1,026 philes, 1,154,989 lines) on the desktop, with several FTS5 layouts. `integration_test/search_perf_test.dart` builds a synthetic archive of the same size on the device (profile build on the Android emulator). The full app was also checked on the emulator, with all 72 issues downloaded.
+- **Found:**
+  - **One FTS row per line is fast.** Specific queries take 0.2–4 ms on the desktop. `the`, which matches 173,106 lines in every phile, takes 98 ms.
+  - **Index size is the cost.** A contentless line index adds 67 MB to the 61 MB archive. `columnsize=0` saves 15 MB, leaving 52 MB. `detail=column` saves only 0.5 MB more, because short lines rarely repeat a token, so positions are nearly free; it would also break phrase queries. `optimize` made no measurable difference to query time, because automerge keeps the index compact.
+  - `contentless_delete=1` cannot be combined with `columnsize=0`.
+  - **On the device:**
+    - The known string is found in **5.5 ms**. Words matching half or more of all 1.16 M lines take 280–360 ms.
+    - Indexing the whole synthetic archive takes 120 s on the emulator. When downloading the real archive, the index kept pace with the polite, rate-limited download and was complete when it finished.
+    - In the app, queries never run before return in 49–189 ms. The first queries made within seconds of a launch were slower (316 and 799 ms), while startup work was still running.
+- **Changed:**
+  - **Index layout (schema v3):**
+    - `line_fts` is FTS5 with `content=''`, `columnsize=0` and `tokenize='unicode61 remove_diacritics 2'`. It has one row per non-blank line, with rowid `phileId << 24 | line`. A match is therefore already a phile and a line, and grouping by phile reads no text.
+    - `title_fts` holds titles and authors for the titles-and-authors filter.
+    - `search_indexed` records which philes are indexed; it cascades with `philes`.
+    - Snippets come from `readLine`, and only for rows on screen.
+  - **Trade-off:** a phrase split across a line break does not match. Words are ANDed on a single line.
+  - **Re-imports:** contentless rows can't be deleted with `columnsize=0`. A re-imported issue removes its titles and orphans its old lines. Search joins on `philes`, and AUTOINCREMENT never reuses an id, so orphans never match (tested). `indexPhile` refuses a phile that is already indexed, because a contentless table would accept duplicate rowids.
+  - **Query language** (`lib/search/`, pure Dart):
+    - Bare words are ANDed prefixes ("hack" finds "hacker"); words shorter than 3 letters match exactly.
+    - A word with punctuation inside ("AT&T") and anything in double quotes is a phrase.
+    - Every token is quoted in the `MATCH` expression, so nothing typed is read as FTS5 syntax.
+    - Highlighting re-tokenises lines the way unicode61 does (case and accent folding, one UTF-16 unit for one), so its ranges are ranges in the displayed text.
+  - **Indexing** follows the index status stream. Philes stored by a download, or left unindexed after the v3 upgrade, are indexed as they appear, one transaction per phile, newest issue first. SQLite runs on drift's background isolate, and philes over 256 KB decode on their own isolate (`readAllLines`). The search screen shows progress, and results refresh when indexing finishes.
+  - **Search screen:**
+    - It is entered from the library once anything is downloaded, and typing is debounced (250 ms).
+    - Results are grouped by issue, newest first, each with a one-line snippet in the reader font, with placeholder substitution. The snippet starts near its first match.
+    - It shows match counts and the query time.
+    - Filters: issue range (a range slider), and titles and authors only.
+    - It reads only the local database, so it works offline (tested with the archive offline).
+  - **Jump to match:** the reader opens with the first matching line a third of the way down the screen, clear of the chrome overlay. It scrolls sideways only if the match lies beyond the visible columns of a wide line. Matches on every line are highlighted with a span background in the theme's selection colour, which never changes glyph advances; a test checks that every character stays on the column grid, and a golden records it.
+- **Not part of Stage H:** with data stored, the emulator takes 10–16 s to show the first frame (4.2 s of it before framework init). A profile build of `main` from before this stage behaves the same, and a launch with no data takes about 3 s. This needs a look on a real device in Stage K.

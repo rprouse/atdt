@@ -11,6 +11,7 @@ import '../ingest/phile_text.dart';
 import '../layout/layout_calculator.dart';
 import '../layout/reading_position.dart';
 import '../layout/text_block.dart';
+import '../search/search_query.dart';
 import 'reader_font.dart';
 
 const double readerHorizontalPadding = 8;
@@ -61,6 +62,8 @@ class ReaderView extends StatefulWidget {
     this.initialPosition = const ReadingPosition.top(),
     this.selection,
     this.selectionColor,
+    this.revealLine,
+    this.highlight,
   });
 
   final PhileText text;
@@ -81,8 +84,15 @@ class ReaderView extends StatefulWidget {
   /// Supplying it turns long-press selection on.
   final ValueNotifier<LineBlock?>? selection;
 
-  /// Behind selected lines.
+  /// Behind selected lines and search matches.
   final Color? selectionColor;
+
+  /// Opens with this line a third of the way down the screen, clear of the
+  /// chrome, instead of at [initialPosition] (a search result).
+  final int? revealLine;
+
+  /// Matches of this query are highlighted on every line.
+  final SearchQuery? highlight;
 
   @override
   State<ReaderView> createState() => ReaderViewState();
@@ -231,6 +241,7 @@ class ReaderViewState extends State<ReaderView> {
             Widget row = _line(
               substitute ? coverage.substitute(line) : line,
               layout,
+              index,
             );
             if (selection == null) return row;
             if (selection.value?.contains(index) ?? false) {
@@ -295,41 +306,75 @@ class ReaderViewState extends State<ReaderView> {
     );
   }
 
-  Widget _line(String text, ReaderLayout layout) {
+  Widget _line(String text, ReaderLayout layout, int index) {
     final height = layout.lineHeight / layout.fontSize;
+    // inherit: false: an ancestor's letter spacing, weight or decoration
+    // must never reach the reader and change column widths.
+    final style = TextStyle(
+      inherit: false,
+      fontFamily: widget.font.family,
+      fontSize: layout.fontSize,
+      fontWeight: FontWeight.normal,
+      fontStyle: FontStyle.normal,
+      letterSpacing: 0,
+      wordSpacing: 0,
+      textBaseline: TextBaseline.alphabetic,
+      height: height,
+      leadingDistribution: TextLeadingDistribution.even,
+      color: widget.foreground,
+      fontFeatures: readerFontFeatures,
+    );
+    // Forcing the strut stops fallback glyphs from a taller font stretching
+    // a row past its fixed extent.
+    final strut = StrutStyle(
+      fontFamily: widget.font.family,
+      fontSize: layout.fontSize,
+      height: height,
+      leadingDistribution: TextLeadingDistribution.even,
+      forceStrutHeight: true,
+    );
+    const noWrap = TextOverflow.visible;
+
+    final matches = widget.highlight?.highlights(text) ?? const [];
+    if (matches.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(left: layout.textLeft),
+        child: Text(
+          text,
+          softWrap: false,
+          maxLines: 1,
+          overflow: noWrap,
+          textScaler: TextScaler.noScaling,
+          style: style,
+          strutStyle: strut,
+        ),
+      );
+    }
+
+    // A background on the matched spans paints behind the glyphs and never
+    // changes their advance, so no column moves.
+    final mark = TextStyle(
+      backgroundColor: widget.selectionColor ?? const Color(0x664488FF),
+    );
+    var at = 0;
+    final spans = <TextSpan>[
+      for (final (start, end) in matches) ...[
+        TextSpan(text: text.substring(at, start)),
+        TextSpan(text: text.substring(start, at = end), style: mark),
+      ],
+      TextSpan(text: text.substring(at)),
+    ];
     return Padding(
+      key: ValueKey('match-$index'),
       padding: EdgeInsets.only(left: layout.textLeft),
-      child: Text(
-        text,
+      child: Text.rich(
+        TextSpan(children: spans),
         softWrap: false,
         maxLines: 1,
-        overflow: TextOverflow.visible,
+        overflow: noWrap,
         textScaler: TextScaler.noScaling,
-        // inherit: false: an ancestor's letter spacing, weight or decoration
-        // must never reach the reader and change column widths.
-        style: TextStyle(
-          inherit: false,
-          fontFamily: widget.font.family,
-          fontSize: layout.fontSize,
-          fontWeight: FontWeight.normal,
-          fontStyle: FontStyle.normal,
-          letterSpacing: 0,
-          wordSpacing: 0,
-          textBaseline: TextBaseline.alphabetic,
-          height: height,
-          leadingDistribution: TextLeadingDistribution.even,
-          color: widget.foreground,
-          fontFeatures: readerFontFeatures,
-        ),
-        // Forcing the strut stops fallback glyphs from a taller font
-        // stretching a row past its fixed extent.
-        strutStyle: StrutStyle(
-          fontFamily: widget.font.family,
-          fontSize: layout.fontSize,
-          height: height,
-          leadingDistribution: TextLeadingDistribution.even,
-          forceStrutHeight: true,
-        ),
+        style: style,
+        strutStyle: strut,
       ),
     );
   }
@@ -359,7 +404,11 @@ class ReaderViewState extends State<ReaderView> {
       );
       return;
     }
+    final firstLayout = _vertical == null;
     _epoch = epoch;
+    if (firstLayout && widget.revealLine != null) {
+      _position = _revealPosition(widget.revealLine!, layout, constraints);
+    }
 
     if (layout.usedFallback) {
       developer.log(
@@ -401,6 +450,32 @@ class ReaderViewState extends State<ReaderView> {
       });
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _publish(advanceRatio));
+  }
+
+  /// The line a third of the way down; scrolled sideways only if its first
+  /// match would be off the right edge (a line wider than 80 columns).
+  ReadingPosition _revealPosition(
+    int line,
+    ReaderLayout layout,
+    BoxConstraints constraints,
+  ) {
+    final visibleLines = constraints.maxHeight / layout.lineHeight;
+    final top = math.max(0, line - (visibleLines / 3).floor());
+    var column = 0.0;
+    final text = line < widget.text.lines.length ? widget.text.lines[line] : '';
+    final matches = widget.highlight?.highlights(text) ?? const [];
+    if (matches.isNotEmpty) {
+      final visibleColumns =
+          (constraints.maxWidth - layout.textLeft - readerHorizontalPadding) /
+          layout.glyphAdvance;
+      final (start, end) = matches.first;
+      if (end > visibleColumns) column = math.max(0, start - 8).toDouble();
+    }
+    return ReadingPosition(
+      topLineIndex: top,
+      fractionIntoLine: 0,
+      columnOffset: column,
+    );
   }
 
   double get _pointerSpread {
