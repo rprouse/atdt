@@ -32,7 +32,7 @@ All stages are built; release needs the owner's device passes and store set-up (
 | H | Search | Done |
 | I | Section navigation | Done |
 | J | CRT effect | Done |
-| K | Release hardening | In review; manual device passes and owner actions open ([test log](docs/test-log.md)) |
+| K | Release hardening | Done; manual passes on other devices and store set-up open ([test log](docs/test-log.md)) |
 
 ## Requirements
 
