@@ -196,7 +196,7 @@ const builtInThemes = [
   ),
   ReaderTheme(
     id: 'paper',
-    displayName: 'Paper',
+    displayName: 'Printout',
     background: Color(0xFFF4EFE1),
     foreground: Color(0xFF26231E),
     selection: Color(0xFFD9CBA8),

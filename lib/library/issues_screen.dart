@@ -7,6 +7,7 @@ import '../download/download_screen.dart';
 import '../reader/reader_screen.dart';
 import '../settings/settings_screen.dart';
 import '../storage/archive_database.dart';
+import 'compact_list.dart';
 import 'issue_screen.dart';
 import 'library_providers.dart';
 import 'search_screen.dart';
@@ -74,35 +75,37 @@ class _IssueList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dim = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
-    return ListView.builder(
-      key: const PageStorageKey('issues'),
-      itemCount: issues.length,
-      itemBuilder: (context, i) {
-        final issue = issues[i];
-        final date = issue.releaseDate == null
-            ? null
-            : formatReleaseDate(issue.releaseDate!);
-        final detail = issue.downloaded
-            ? '${issue.phileCount} philes'
-            : 'Not downloaded';
-        return ListTile(
-          key: ValueKey('issue-${issue.number}'),
-          title: Text(
-            'Issue ${issue.number}',
-            style: issue.downloaded ? null : TextStyle(color: dim),
-          ),
-          subtitle: Text([?date, detail].join(' · ')),
-          trailing: issue.downloaded
+    return CompactListTiles(
+      child: ListView.builder(
+        key: const PageStorageKey('issues'),
+        itemCount: issues.length,
+        itemBuilder: (context, i) {
+          final issue = issues[i];
+          final date = issue.releaseDate == null
               ? null
-              : Icon(Icons.cloud_off_outlined, color: dim),
-          onTap: () => _push(
-            context,
-            issue.downloaded
-                ? IssueScreen(issue: issue.number)
-                : const DownloadScreen(),
-          ),
-        );
-      },
+              : formatReleaseDate(issue.releaseDate!);
+          final detail = issue.downloaded
+              ? '${issue.phileCount} philes'
+              : 'Not downloaded';
+          return ListTile(
+            key: ValueKey('issue-${issue.number}'),
+            title: Text(
+              'Issue ${issue.number}',
+              style: issue.downloaded ? null : TextStyle(color: dim),
+            ),
+            subtitle: Text([?date, detail].join(' · ')),
+            trailing: issue.downloaded
+                ? null
+                : Icon(Icons.cloud_off_outlined, color: dim),
+            onTap: () => _push(
+              context,
+              issue.downloaded
+                  ? IssueScreen(issue: issue.number)
+                  : const DownloadScreen(),
+            ),
+          );
+        },
+      ),
     );
   }
 }
