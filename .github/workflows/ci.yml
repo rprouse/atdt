@@ -98,6 +98,9 @@ jobs:
           print(next(d["udid"] for runtime, ds in devices.items()
                      if "iOS" in runtime for d in ds if "iPhone" in d["name"]))')
           xcrun simctl boot "$udid"
+          # boot returns before the simulator is ready; a first test started
+          # then times out connecting to the app's VM service.
+          xcrun simctl bootstatus "$udid" -b
           echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
       - run: flutter test integration_test/app_test.dart -d "$SIMULATOR"
       - run: flutter test integration_test/reader_rotation_test.dart -d "$SIMULATOR"
