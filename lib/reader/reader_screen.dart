@@ -409,45 +409,75 @@ class _TopBar extends ConsumerWidget {
                   style: TextStyle(color: theme.dim, fontSize: 14),
                 ),
               ),
-              if (sections.isNotEmpty)
-                IconButton(
-                  key: const ValueKey('sections'),
-                  tooltip: 'Sections',
-                  icon: const Icon(Icons.toc),
-                  onPressed: () => _showSections(context),
+              const SizedBox(width: 4),
+              // Everything else lives in one menu, leaving the bar to the
+              // title and progress.
+              MenuAnchor(
+                menuChildren: [
+                  if (sections.isNotEmpty)
+                    MenuItemButton(
+                      key: const ValueKey('sections'),
+                      leadingIcon: const Icon(Icons.toc),
+                      onPressed: () => _showSections(context),
+                      child: const Text('Sections'),
+                    ),
+                  SubmenuButton(
+                    key: const ValueKey('menu-font'),
+                    leadingIcon: const Icon(Icons.text_fields),
+                    menuChildren: [
+                      for (final f in registry.fonts)
+                        _Choice(
+                          key: ValueKey('menu-font-${f.id}'),
+                          label: f.displayName,
+                          selected: f.id == font.id,
+                          onPressed: () => notifier.setFont(f.id),
+                        ),
+                    ],
+                    child: const Text('Font'),
+                  ),
+                  SubmenuButton(
+                    key: const ValueKey('menu-theme'),
+                    leadingIcon: const Icon(Icons.palette_outlined),
+                    menuChildren: [
+                      for (final t in ref.watch(allThemesProvider))
+                        _Choice(
+                          key: ValueKey('menu-theme-${t.id}'),
+                          label: t.displayName,
+                          selected: t.id == theme.id,
+                          onPressed: () => notifier.setTheme(t.id),
+                        ),
+                    ],
+                    child: const Text('Theme'),
+                  ),
+                  SubmenuButton(
+                    key: const ValueKey('menu-orientation'),
+                    leadingIcon: const Icon(Icons.screen_rotation),
+                    menuChildren: [
+                      for (final m in OrientationMode.values)
+                        _Choice(
+                          key: ValueKey('menu-orientation-${m.name}'),
+                          label: m.label,
+                          selected: m == settings.orientation,
+                          onPressed: () => notifier.setOrientation(m),
+                        ),
+                    ],
+                    child: const Text('Orientation'),
+                  ),
+                  _Choice(
+                    key: const ValueKey('menu-debug'),
+                    label: 'Debug overlay',
+                    selected: settings.showDebugOverlay,
+                    onPressed: notifier.toggleDebugOverlay,
+                  ),
+                ],
+                builder: (context, controller, _) => IconButton(
+                  key: const ValueKey('reader-menu'),
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => controller.isOpen
+                      ? controller.close()
+                      : controller.open(),
                 ),
-              _Menu<String>(
-                tooltip: 'Font',
-                icon: Icons.text_fields,
-                selected: font.id,
-                items: {for (final f in registry.fonts) f.id: f.displayName},
-                onSelected: notifier.setFont,
-              ),
-              _Menu<String>(
-                tooltip: 'Theme',
-                icon: Icons.palette_outlined,
-                selected: theme.id,
-                items: {
-                  for (final t in ref.watch(allThemesProvider))
-                    t.id: t.displayName,
-                },
-                onSelected: notifier.setTheme,
-              ),
-              _Menu<OrientationMode>(
-                tooltip: 'Orientation',
-                icon: Icons.screen_rotation,
-                selected: settings.orientation,
-                items: {for (final m in OrientationMode.values) m: m.label},
-                onSelected: notifier.setOrientation,
-              ),
-              IconButton(
-                tooltip: 'Debug overlay',
-                icon: Icon(
-                  settings.showDebugOverlay
-                      ? Icons.bug_report
-                      : Icons.bug_report_outlined,
-                ),
-                onPressed: notifier.toggleDebugOverlay,
               ),
             ],
           ),
@@ -539,35 +569,28 @@ class _SectionsSheetState extends State<_SectionsSheet> {
   }
 }
 
-class _Menu<T> extends StatelessWidget {
-  const _Menu({
-    required this.tooltip,
-    required this.icon,
+/// A menu entry with a tick when it is the current choice (or switched on).
+class _Choice extends StatelessWidget {
+  const _Choice({
+    required this.label,
     required this.selected,
-    required this.items,
-    required this.onSelected,
+    required this.onPressed,
+    super.key,
   });
 
-  final String tooltip;
-  final IconData icon;
-  final T? selected;
-  final Map<T, String> items;
-  final ValueChanged<T> onSelected;
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => PopupMenuButton<T>(
-    tooltip: tooltip,
-    icon: Icon(icon),
-    initialValue: selected,
-    onSelected: onSelected,
-    itemBuilder: (context) => [
-      for (final MapEntry(:key, :value) in items.entries)
-        CheckedPopupMenuItem<T>(
-          value: key,
-          checked: key == selected,
-          child: Text(value),
-        ),
-    ],
+  Widget build(BuildContext context) => MenuItemButton(
+    // A fixed-width slot, so labels line up whether ticked or not.
+    leadingIcon: SizedBox(
+      width: 24,
+      child: selected ? const Icon(Icons.check) : null,
+    ),
+    onPressed: onPressed,
+    child: Text(label),
   );
 }
 

@@ -66,6 +66,11 @@ Future<void> _open(WidgetTester tester, ArchiveDatabase db, int id) async {
 ReaderViewState _reader(WidgetTester tester) =>
     tester.state<ReaderViewState>(find.byType(ReaderView));
 
+Future<void> _openMenu(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('reader-menu')));
+  await tester.pumpAndSettle();
+}
+
 bool _chromeVisible(WidgetTester tester) => !tester
     .widget<IgnorePointer>(find.byKey(const ValueKey('chrome-gate')))
     .ignoring;
@@ -80,6 +85,8 @@ void main() {
   testWidgets('no jump list when no sections were found', (tester) async {
     final id = await seedPhile(db, 'tabs_code.txt');
     await _open(tester, db, id);
+    await _openMenu(tester);
+    expect(find.byKey(const ValueKey('menu-font')), findsOneWidget);
     expect(find.byKey(const ValueKey('sections')), findsNothing);
   });
 
@@ -88,6 +95,7 @@ void main() {
     final id = await _store(db, _sectioned());
     await _open(tester, db, id);
 
+    await _openMenu(tester);
     await tester.tap(find.byKey(const ValueKey('sections')));
     await tester.pumpAndSettle();
     expect(find.text('1  Introduction'), findsOneWidget);
@@ -113,6 +121,7 @@ void main() {
     _reader(tester).verticalController!.jumpTo(400 * layout.lineHeight);
     await tester.pumpAndSettle();
 
+    await _openMenu(tester);
     await tester.tap(find.byKey(const ValueKey('sections')));
     await tester.pumpAndSettle();
     bool selected(int line) =>
