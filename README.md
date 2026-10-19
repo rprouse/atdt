@@ -32,7 +32,7 @@ All stages are built; release needs the owner's device passes and store set-up (
 | H | Search | Done |
 | I | Section navigation | Done |
 | J | CRT effect | Done |
-| K | Release hardening | In review; manual device passes and owner actions open ([test log](docs/test-log.md)) |
+| K | Release hardening | Done; manual passes on other devices and store set-up open ([test log](docs/test-log.md)) |
 
 ## Requirements
 
@@ -51,7 +51,7 @@ flutter run
 
 The app opens on the list of Phrack issues. On first launch it explains the one-time download (about 31 MB from archives.phrack.org) and starts it when you confirm; issues appear as they arrive, and an interrupted download resumes. Tap an issue for its philes, and a phile to read it.
 
-In the reader, tap the text to show or hide the chrome. The chrome switches font (JetBrains Mono, IBM Plex Mono, BigBlue Terminal, Terminus or C64 Pro Mono), theme and orientation (Auto, Portrait, Landscape), and the bug icon shows a layout debug overlay. The settings screen (gear icon on the issues list) has the same choices, which are remembered, five built-in themes (green and amber phosphor, paper, high contrast, VGA blue) plus your own themes made with a colour picker, plus Credits with every font's licence. Characters a font cannot draw show as its `·` (or `?`) so columns never shift, and the reader offers a font that has them all. The cloud icon checks for new issues.
+In the reader, tap the text to show or hide the chrome; reading on hides it, and a deliberate scroll back up brings it back. The chrome shows the title and how far through you are, and its ☰ menu holds Sections (when the phile has headings), font (JetBrains Mono, IBM Plex Mono, BigBlue Terminal, Terminus or C64 Pro Mono), theme, orientation (Auto, Portrait, Landscape) and a layout debug overlay. The settings screen (gear icon on the issues list) has the same choices, which are remembered, five built-in themes (green and amber phosphor, printout, high contrast, VGA blue) plus your own themes made with a colour picker, plus Credits with every font's licence. Characters a font cannot draw show as its `·` (or `?`) so columns never shift, and the reader offers a font that has them all. The cloud icon checks for new issues.
 
 Phrack text is never committed to this repository or bundled in the app: the app downloads it on the device.
 

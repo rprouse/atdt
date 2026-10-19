@@ -40,7 +40,7 @@ void main() {
       containsAll([
         'green_phosphor',
         'amber_phosphor',
-        'paper',
+        'printout',
         'high_contrast',
       ]),
     );
@@ -50,7 +50,7 @@ void main() {
 
   test('brightness follows the background', () {
     expect(
-      builtInThemes.firstWhere((t) => t.id == 'paper').brightness,
+      builtInThemes.firstWhere((t) => t.id == 'printout').brightness,
       Brightness.light,
     );
     expect(builtInThemes.first.brightness, Brightness.dark);

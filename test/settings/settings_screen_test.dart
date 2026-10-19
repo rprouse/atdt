@@ -61,13 +61,13 @@ void main() {
     final container = await _pump(tester);
 
     await tester.tap(find.byKey(const ValueKey('font-c64_pro_mono')));
-    await tester.tap(find.byKey(const ValueKey('theme-paper')));
+    await tester.tap(find.byKey(const ValueKey('theme-printout')));
     await tester.tap(find.byKey(const ValueKey('orientation-landscape')));
     await tester.pumpAndSettle();
 
     final settings = container.read(readerSettingsProvider);
     expect(container.read(currentFontProvider).id, 'c64_pro_mono');
-    expect(container.read(currentThemeProvider).id, 'paper');
+    expect(container.read(currentThemeProvider).id, 'printout');
     expect(settings.orientation, OrientationMode.landscape);
     // Orientation applies inside the reader only; choosing it in Settings
     // must not rotate the library.

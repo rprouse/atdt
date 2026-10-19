@@ -70,8 +70,10 @@ class ReaderView extends StatefulWidget {
   final ReaderFont font;
   final Color foreground;
 
-  /// Called with the direction of user-driven vertical scrolling.
-  final ValueChanged<ScrollDirection>? onVerticalUserScroll;
+  /// Called with each movement of user-driven vertical scrolling (a drag,
+  /// or the fling after it), in logical pixels: positive reads further
+  /// down. Programmatic scrolling (paging, jumps) is not reported.
+  final ValueChanged<double>? onVerticalUserScroll;
 
   /// Receives layout and position updates for the debug overlay.
   final ValueNotifier<ReaderDiagnostics?>? diagnostics;
@@ -304,8 +306,8 @@ class ReaderViewState extends State<ReaderView> {
             onPointerMove: _pointerMove,
             onPointerUp: _pointerEnd,
             onPointerCancel: _pointerEnd,
-            child: NotificationListener<UserScrollNotification>(
-              onNotification: _onUserScroll,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _onScrollNotification,
               child: ClipRect(child: content),
             ),
           ),
@@ -551,10 +553,17 @@ class ReaderViewState extends State<ReaderView> {
     );
   }
 
-  bool _onUserScroll(UserScrollNotification notification) {
-    if (notification.metrics.axis == Axis.vertical &&
-        notification.direction != ScrollDirection.idle) {
-      widget.onVerticalUserScroll?.call(notification.direction);
+  /// Between a user scroll starting and going idle, every vertical scroll
+  /// update is the user's (their drag or its fling).
+  bool _userScrolling = false;
+
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is UserScrollNotification) {
+      _userScrolling = notification.direction != ScrollDirection.idle;
+    } else if (notification is ScrollUpdateNotification && _userScrolling) {
+      final delta = notification.scrollDelta;
+      if (delta != null && delta != 0) widget.onVerticalUserScroll?.call(delta);
     }
     return false;
   }

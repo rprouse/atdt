@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -180,9 +179,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _setChromeVisible(false);
   }
 
-  void _onVerticalUserScroll(ScrollDirection direction) {
-    // reverse: content moving up, i.e. reading further down.
-    _setChromeVisible(direction == ScrollDirection.forward);
+  /// Scrolling travel in the current direction: positive reads on.
+  double _scrollTravel = 0;
+
+  /// Reading on hides the chrome almost at once. Bringing it back takes a
+  /// deliberate scroll up: a finger resting at the end of a drag drifts a
+  /// few pixels back, and showing the chrome on any upward movement made it
+  /// flicker back while reading.
+  void _onVerticalUserScroll(double delta) {
+    if (delta.sign != _scrollTravel.sign) _scrollTravel = 0;
+    _scrollTravel += delta;
+    if (_scrollTravel >= chromeHideScroll) {
+      _setChromeVisible(false);
+    } else if (_scrollTravel <= -chromeShowScroll) {
+      _setChromeVisible(true);
+    }
   }
 
   @override
@@ -207,19 +218,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             _setChromeVisible(!_chromeVisible);
           }
         },
-        child: ReaderView(
-          key: _readerKey,
-          text: value.text,
-          font: font,
-          foreground: theme.foreground,
-          onVerticalUserScroll: _onVerticalUserScroll,
-          diagnostics: _diagnostics,
-          onPositionChanged: _onPosition,
-          initialPosition: value.position ?? const ReadingPosition.top(),
-          selection: _selection,
-          selectionColor: theme.selection,
-          revealLine: widget.revealLine,
-          highlight: widget.highlight,
+        // Keeps the first line off the screen's edge, which curves away on
+        // edge-display phones held in landscape. The same with the chrome
+        // shown or hidden, so no line moves when it toggles.
+        child: Padding(
+          padding: const EdgeInsets.only(top: readerTopInset),
+          child: ReaderView(
+            key: _readerKey,
+            text: value.text,
+            font: font,
+            foreground: theme.foreground,
+            onVerticalUserScroll: _onVerticalUserScroll,
+            diagnostics: _diagnostics,
+            onPositionChanged: _onPosition,
+            initialPosition: value.position ?? const ReadingPosition.top(),
+            selection: _selection,
+            selectionColor: theme.selection,
+            revealLine: widget.revealLine,
+            highlight: widget.highlight,
+          ),
         ),
       ),
       AsyncError(:final error) => Center(
@@ -392,45 +409,75 @@ class _TopBar extends ConsumerWidget {
                   style: TextStyle(color: theme.dim, fontSize: 14),
                 ),
               ),
-              if (sections.isNotEmpty)
-                IconButton(
-                  key: const ValueKey('sections'),
-                  tooltip: 'Sections',
-                  icon: const Icon(Icons.toc),
-                  onPressed: () => _showSections(context),
+              const SizedBox(width: 4),
+              // Everything else lives in one menu, leaving the bar to the
+              // title and progress.
+              MenuAnchor(
+                menuChildren: [
+                  if (sections.isNotEmpty)
+                    MenuItemButton(
+                      key: const ValueKey('sections'),
+                      leadingIcon: const Icon(Icons.toc),
+                      onPressed: () => _showSections(context),
+                      child: const Text('Sections'),
+                    ),
+                  SubmenuButton(
+                    key: const ValueKey('menu-font'),
+                    leadingIcon: const Icon(Icons.text_fields),
+                    menuChildren: [
+                      for (final f in registry.fonts)
+                        _Choice(
+                          key: ValueKey('menu-font-${f.id}'),
+                          label: f.displayName,
+                          selected: f.id == font.id,
+                          onPressed: () => notifier.setFont(f.id),
+                        ),
+                    ],
+                    child: const Text('Font'),
+                  ),
+                  SubmenuButton(
+                    key: const ValueKey('menu-theme'),
+                    leadingIcon: const Icon(Icons.palette_outlined),
+                    menuChildren: [
+                      for (final t in ref.watch(allThemesProvider))
+                        _Choice(
+                          key: ValueKey('menu-theme-${t.id}'),
+                          label: t.displayName,
+                          selected: t.id == theme.id,
+                          onPressed: () => notifier.setTheme(t.id),
+                        ),
+                    ],
+                    child: const Text('Theme'),
+                  ),
+                  SubmenuButton(
+                    key: const ValueKey('menu-orientation'),
+                    leadingIcon: const Icon(Icons.screen_rotation),
+                    menuChildren: [
+                      for (final m in OrientationMode.values)
+                        _Choice(
+                          key: ValueKey('menu-orientation-${m.name}'),
+                          label: m.label,
+                          selected: m == settings.orientation,
+                          onPressed: () => notifier.setOrientation(m),
+                        ),
+                    ],
+                    child: const Text('Orientation'),
+                  ),
+                  _Choice(
+                    key: const ValueKey('menu-debug'),
+                    label: 'Debug overlay',
+                    selected: settings.showDebugOverlay,
+                    onPressed: notifier.toggleDebugOverlay,
+                  ),
+                ],
+                builder: (context, controller, _) => IconButton(
+                  key: const ValueKey('reader-menu'),
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => controller.isOpen
+                      ? controller.close()
+                      : controller.open(),
                 ),
-              _Menu<String>(
-                tooltip: 'Font',
-                icon: Icons.text_fields,
-                selected: font.id,
-                items: {for (final f in registry.fonts) f.id: f.displayName},
-                onSelected: notifier.setFont,
-              ),
-              _Menu<String>(
-                tooltip: 'Theme',
-                icon: Icons.palette_outlined,
-                selected: theme.id,
-                items: {
-                  for (final t in ref.watch(allThemesProvider))
-                    t.id: t.displayName,
-                },
-                onSelected: notifier.setTheme,
-              ),
-              _Menu<OrientationMode>(
-                tooltip: 'Orientation',
-                icon: Icons.screen_rotation,
-                selected: settings.orientation,
-                items: {for (final m in OrientationMode.values) m: m.label},
-                onSelected: notifier.setOrientation,
-              ),
-              IconButton(
-                tooltip: 'Debug overlay',
-                icon: Icon(
-                  settings.showDebugOverlay
-                      ? Icons.bug_report
-                      : Icons.bug_report_outlined,
-                ),
-                onPressed: notifier.toggleDebugOverlay,
               ),
             ],
           ),
@@ -522,35 +569,28 @@ class _SectionsSheetState extends State<_SectionsSheet> {
   }
 }
 
-class _Menu<T> extends StatelessWidget {
-  const _Menu({
-    required this.tooltip,
-    required this.icon,
+/// A menu entry with a tick when it is the current choice (or switched on).
+class _Choice extends StatelessWidget {
+  const _Choice({
+    required this.label,
     required this.selected,
-    required this.items,
-    required this.onSelected,
+    required this.onPressed,
+    super.key,
   });
 
-  final String tooltip;
-  final IconData icon;
-  final T? selected;
-  final Map<T, String> items;
-  final ValueChanged<T> onSelected;
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => PopupMenuButton<T>(
-    tooltip: tooltip,
-    icon: Icon(icon),
-    initialValue: selected,
-    onSelected: onSelected,
-    itemBuilder: (context) => [
-      for (final MapEntry(:key, :value) in items.entries)
-        CheckedPopupMenuItem<T>(
-          value: key,
-          checked: key == selected,
-          child: Text(value),
-        ),
-    ],
+  Widget build(BuildContext context) => MenuItemButton(
+    // A fixed-width slot, so labels line up whether ticked or not.
+    leadingIcon: SizedBox(
+      width: 24,
+      child: selected ? const Icon(Icons.check) : null,
+    ),
+    onPressed: onPressed,
+    child: Text(label),
   );
 }
 
@@ -670,6 +710,14 @@ class _CopyBar extends StatelessWidget {
     ),
   );
 }
+
+/// Scrolling down this far hides the chrome; scrolling up [chromeShowScroll]
+/// brings it back (logical pixels, in one direction without reversing).
+const double chromeHideScroll = 8;
+const double chromeShowScroll = 64;
+
+/// Space above the first line of text, in logical pixels.
+const double readerTopInset = 12;
 
 /// Volume-button paging is Android-only (spec): iOS gives apps no such hook.
 bool get isAndroid =>
