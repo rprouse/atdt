@@ -79,7 +79,7 @@ jobs:
   # tests on an iPhone simulator.
   ios:
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -102,7 +102,20 @@ jobs:
           # then times out connecting to the app's VM service.
           xcrun simctl bootstatus "$udid" -b
           echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
-      - run: flutter test integration_test/app_test.dart -d "$SIMULATOR"
-      - run: flutter test integration_test/reader_rotation_test.dart -d "$SIMULATOR"
-      - run: flutter test integration_test/reader_polish_test.dart -d "$SIMULATOR"
+      # A first launch on a fresh simulator sometimes never connects (seen
+      # in 2 of 3 runs): each test gets 15 minutes and one retry, and a
+      # failure prints the app's simulator log. macOS has no `timeout`.
+      - name: Device tests
+        run: |
+          device_test() {
+            for attempt in 1 2; do
+              perl -e 'alarm shift; exec @ARGV' 900                 flutter test "$1" -d "$SIMULATOR" && return 0
+              echo "::warning::$1 attempt $attempt failed or stalled"
+              xcrun simctl spawn "$SIMULATOR" log show --last 15m --style compact                 --predicate 'process == "Runner"' | tail -150 || true
+            done
+            return 1
+          }
+          device_test integration_test/app_test.dart
+          device_test integration_test/reader_rotation_test.dart
+          device_test integration_test/reader_polish_test.dart
 

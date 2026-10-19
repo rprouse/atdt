@@ -389,8 +389,14 @@ ferent`).
   - Credits for Phrack and every font were already in place (Stage E).
 - **CI:**
   - Android job: a release build, then the device tests on an API 34 emulator.
-  - iOS job: `flutter build ios --release --no-codesign`, the first compile of `AppDelegate.swift`, then the device tests on an iPhone simulator.
-  - The search and scroll benchmarks stay manual (real device).
+  - iOS job: `flutter build ios --release --no-codesign`, the first compile of `AppDelegate.swift`, then the device tests on an iPhone simulator. **The Swift built, and launch, rotation and reading position passed on the simulator.**
+  - The storage, search and scroll benchmarks stay manual (real device). The storage benchmark ran for over half an hour on a debug-build simulator.
+  - **First-launch flakes:** two of the first runs failed their first device test without running it. Android was installed but never started, until cancelled at 45 minutes; iOS hit "Connecting to the VM Service timed out". In both, later launches on the same device passed, 10 of 12 overall. `simctl boot` returns before the simulator is ready, so the iOS job now waits with `bootstatus -b`. Android tests get 10 minutes each and dump logcat on failure.
+- **Open: `app_test` with an archive stored.**
+  - On the local emulator, `integration_test/app_test.dart` failed once with an archive present. Its error output was lost when the emulator crashed shortly afterwards, and the emulator then wouldn't boot again, so it couldn't be reproduced.
+  - `test/app_walk_test.dart` runs the same walk on the whole app, with the indexer running, and passes.
+  - The likely cause is timing: the archive had just been re-downloaded, so indexing was probably still running, and `app_test` allows 10 s per step while a phile opens behind index transactions.
+  - Rerun on a device with a complete archive.
 - **Owner actions:**
   - Contact the Phrack staff before public release (spec).
   - Create the Android upload key and the App Store / Play Console listings.
