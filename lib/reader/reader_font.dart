@@ -56,12 +56,18 @@ class FontRegistry {
     required Future<ByteData> Function(String path) loadBytes,
   }) async {
     final manifest = FontManifest.parse(await loadString(manifestPath));
+    // Every file is requested at once. On Android each asset load is a
+    // platform message answered on the main thread, which can stall for
+    // seconds at launch (docs/decisions.md); one at a time, the waits add up.
+    final bytes = await Future.wait([
+      for (final spec in manifest.fonts)
+        Future.wait([for (final file in spec.files) loadBytes('$_root$file')]),
+    ]);
     final fonts = <ReaderFont>[];
-    for (final spec in manifest.fonts) {
+    for (final (i, spec) in manifest.fonts.indexed) {
       final loader = FontLoader(spec.family);
       final codePoints = <int>{};
-      for (final file in spec.files) {
-        final data = await loadBytes('$_root$file');
+      for (final data in bytes[i]) {
         codePoints.addAll(
           GlyphCoverage.fromFontBytes(
             data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),

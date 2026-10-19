@@ -54,6 +54,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   drift_dev: ^2.35.1
   build_runner: ^2.16.2
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -73,3 +74,15 @@ flutter:
   # The optional CRT effect over the reader (Stage J).
   shaders:
     - shaders/crt.frag
+
+# App icons from assets/icon/ (drawn by tool/make_icon.py):
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/icon/icon.png
+  adaptive_icon_background: "#0A120A"
+  adaptive_icon_foreground: assets/icon/foreground.png
+  # The foreground already keeps the mark inside the safe zone.
+  adaptive_icon_foreground_inset: 0
+  remove_alpha_ios: true

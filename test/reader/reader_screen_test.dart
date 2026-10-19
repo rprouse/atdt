@@ -132,6 +132,65 @@ void main() {
     expect(_textGeometry(tester).$1.dx, closeTo(before.$1.dx + 30, 0.01));
   });
 
+  group('folds and hinges', () {
+    // A book-style device, open: 900 wide, a vertical feature at 440-460.
+    const size = Size(900, 700);
+    DisplayFeature feature(
+      DisplayFeatureType type,
+      DisplayFeatureState state,
+    ) => DisplayFeature(
+      bounds: const Rect.fromLTWH(440, 0, 20, 700),
+      type: type,
+      state: state,
+    );
+
+    double rightEdge(WidgetTester tester) =>
+        glyphExtent(tester, tester.widget<Text>(_tenthLine).data!).right;
+
+    testWidgets('a hinge keeps all 80 columns in one pane', (tester) async {
+      await openApp(tester, size: size);
+      tester.view.displayFeatures = [
+        feature(DisplayFeatureType.hinge, DisplayFeatureState.unknown),
+      ];
+      await tester.pumpAndSettle();
+      expect(rightEdge(tester), lessThanOrEqualTo(440));
+      expect(tester.getTopLeft(_firstLine).dx, lessThan(440));
+    });
+
+    testWidgets('so does a half-open fold', (tester) async {
+      await openApp(tester, size: size);
+      tester.view.displayFeatures = [
+        feature(DisplayFeatureType.fold, DisplayFeatureState.postureHalfOpened),
+      ];
+      await tester.pumpAndSettle();
+      expect(rightEdge(tester), lessThanOrEqualTo(440));
+    });
+
+    testWidgets('a fold lying flat keeps the full width', (tester) async {
+      await openApp(tester, size: size);
+      final before = rightEdge(tester);
+      tester.view.displayFeatures = [
+        feature(DisplayFeatureType.fold, DisplayFeatureState.postureFlat),
+      ];
+      await tester.pumpAndSettle();
+      expect(rightEdge(tester), closeTo(before, 0.01));
+      expect(before, greaterThan(460));
+    });
+
+    testWidgets('the larger pane wins', (tester) async {
+      await openApp(tester, size: size);
+      tester.view.displayFeatures = [
+        const DisplayFeature(
+          bounds: Rect.fromLTWH(300, 0, 20, 700),
+          type: DisplayFeatureType.hinge,
+          state: DisplayFeatureState.unknown,
+        ),
+      ];
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(_firstLine).dx, greaterThanOrEqualTo(320));
+    });
+  });
+
   group('coverage notice', () {
     Future<ProviderContainer> openPhile(
       WidgetTester tester,

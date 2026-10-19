@@ -4,6 +4,7 @@
 library;
 
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:isolate';
 import 'dart:typed_data';
 
@@ -160,16 +161,12 @@ class ArchiveDownloader {
               failedIssues: List.unmodifiable(failed),
             ),
           );
-          final imported = await importer(issue, bytes);
-          await store.saveIssue(
-            imported,
-            fetchedAt: _clock().toUtc(),
-            releaseDate: dates[issue],
-          );
-          completed++;
+          if (await _importAndSave(issue, bytes, dates[issue])) {
+            completed++;
+          } else {
+            failed.add(issue);
+          }
         } on ArchiveHttpException {
-          failed.add(issue);
-        } on ArchiveFormatException {
           failed.add(issue);
         }
       }
@@ -186,6 +183,35 @@ class ArchiveDownloader {
             'The Phrack archive returned an error (HTTP ${e.statusCode}). '
             'Try again later.',
       );
+    }
+  }
+
+  /// Imports and stores one issue; false if it could not be. An issue that
+  /// fails, for any reason, is reported and the run moves on: one bad
+  /// archive (or a parser bug it reveals) must never stop the rest.
+  Future<bool> _importAndSave(
+    int issue,
+    Uint8List bytes,
+    DateTime? releaseDate,
+  ) async {
+    try {
+      final imported = await importer(issue, bytes);
+      await store.saveIssue(
+        imported,
+        fetchedAt: _clock().toUtc(),
+        releaseDate: releaseDate,
+      );
+      return true;
+    } on ArchiveFormatException {
+      return false;
+    } on Object catch (e, s) {
+      developer.log(
+        'issue $issue could not be imported',
+        name: 'atdt.download',
+        error: e,
+        stackTrace: s,
+      );
+      return false;
     }
   }
 

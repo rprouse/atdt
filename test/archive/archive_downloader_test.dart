@@ -156,6 +156,24 @@ void main() {
     expect(store.saved.keys, [1]);
   });
 
+  test('an unexpected import or storage error fails only that issue', () async {
+    source = _FakeSource([1, 2, 3, 4]);
+    final events = await ArchiveDownloader(
+      source: source,
+      store: store,
+      importer: (n, b) async => switch (n) {
+        2 => throw StateError('parser bug'),
+        3 => throw RangeError('index'),
+        _ => importIssueArchive(n, b),
+      },
+      politeDelay: Duration.zero,
+    ).run().toList();
+
+    expect(events.last.phase, DownloadPhase.done);
+    expect(events.last.failedIssues, [2, 3]);
+    expect(store.saved.keys, [1, 4]);
+  });
+
   test('cancelling stops between issues and keeps what is done', () async {
     final cancel = CancelToken();
     source = _FakeSource([1, 2, 3])

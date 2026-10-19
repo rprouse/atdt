@@ -1,5 +1,6 @@
 // Launch on a device. With an archive already downloaded (e.g. from an
 // earlier run), also walks library -> issue -> phile -> reader -> back.
+import 'package:atdt/library/issue_screen.dart';
 import 'package:atdt/library/issues_screen.dart';
 import 'package:atdt/main.dart' as app;
 import 'package:atdt/reader/reader_view.dart';
@@ -33,13 +34,21 @@ void main() {
     }
 
     await tester.tap(issue.first);
-    await pumpUntil(tester, find.byType(ListTile));
-    await tester.tap(find.byType(ListTile).first);
+    // The issue's own philes: during the page transition the library's
+    // tiles are still in the tree, and tapping one taps under the new page.
+    final philes = find.descendant(
+      of: find.byType(IssueScreen),
+      matching: find.byType(ListTile),
+    );
+    await pumpUntil(tester, philes);
+    await tester.pumpAndSettle();
+    await tester.tap(philes.first);
     await pumpUntil(tester, find.byType(ReaderView));
     expect(find.byType(ReaderView), findsOneWidget);
 
     await tester.pageBack();
-    await pumpUntil(tester, find.byType(ListTile));
+    await tester.pumpAndSettle();
     expect(find.byType(ReaderView), findsNothing);
+    expect(philes, findsWidgets);
   });
 }

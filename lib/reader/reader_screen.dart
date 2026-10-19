@@ -161,6 +161,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _setChromeVisible(bool visible) {
+    // With a screen reader the chrome stays: its buttons must be reachable,
+    // and nobody taps the page to bring them back.
+    if (!visible && MediaQuery.accessibleNavigationOf(context)) return;
     if (visible == _chromeVisible) return;
     setState(() => _chromeVisible = visible);
     unawaited(
@@ -193,6 +196,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final Widget body = switch (phile) {
       AsyncData(:final value) => GestureDetector(
         behavior: HitTestBehavior.translucent,
+        // A visual convenience; to a screen reader it would be one unlabelled
+        // button over every line.
+        excludeFromSemantics: true,
         onTap: () {
           // A tap clears a selection before it toggles the chrome.
           if (_selection.value != null) {
@@ -239,16 +245,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             child: IgnorePointer(
               key: const ValueKey('chrome-gate'),
               ignoring: !_chromeVisible,
-              child: AnimatedSlide(
-                offset: _chromeVisible ? Offset.zero : const Offset(0, -1),
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                child: _TopBar(
-                  title: title,
-                  theme: theme,
-                  diagnostics: _diagnostics,
-                  sections: phile.value?.sections ?? const [],
-                  onJump: _jumpTo,
+              // Slid off screen, its buttons must not be found by touch
+              // exploration either.
+              child: ExcludeSemantics(
+                excluding: !_chromeVisible,
+                child: AnimatedSlide(
+                  offset: _chromeVisible ? Offset.zero : const Offset(0, -1),
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  child: _TopBar(
+                    title: title,
+                    theme: theme,
+                    diagnostics: _diagnostics,
+                    sections: phile.value?.sections ?? const [],
+                    onJump: _jumpTo,
+                  ),
                 ),
               ),
             ),
