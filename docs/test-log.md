@@ -26,6 +26,7 @@ Run on a fresh install unless noted.
 | 2026-10-17 | Galaxy S23 Ultra (SM-S918W), large phone | Android | owner's build | Owner: "responsive and looks good". The CRT effect at the first tuning was too subtle (since retuned). Frame times not yet recorded. |
 | 2026-10-18 | Android emulator (sdk_gphone64_x86_64, 1080x2400), large phone | Android 16, Impeller GLES | profile and release | Checks 1-9 and 11 over Stages B-K (see docs/decisions.md). Release build downloads the archive (needed the INTERNET fix). Cold start with the archive stored: 5.8-7.4 s in release (5-7 s in profile), dominated by an emulator main-thread stall. Killing the app mid-download (at issue 53) resumed on the next launch ("Downloading issue 63 (1 of 10)" after further kills). 71/7 open: 204 MB PSS, stable across repeated opens. |
 | 2026-10-18 | Same emulator at 1600x2560 and 2560x1600, tablet sizes | Android 16 | profile | Library lays out; reader fits 80 columns; resizing between the two kept the position (check 12, resize). Not a real tablet. |
+| 2026-10-19 | Android emulator (Pixel 7, API 36), cold-booted | Android 16 | debug | Full archive downloaded in 162 s (debug build) and indexed; `app_test` with the archive stored passes (library, issue, phile, reader, back) after fixing the test's race. |
 | | Small Android phone | | | **To do** |
 | | Android tablet | | | **To do** |
 | | Small iPhone | | | **To do** (needs a Mac for the build) |

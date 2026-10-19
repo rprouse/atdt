@@ -393,11 +393,12 @@ ferent`).
   - The storage, search and scroll benchmarks stay manual (real device). The storage benchmark ran for over half an hour on a debug-build simulator.
   - **First-launch flakes:** two of the first runs failed their first device test without running it. Android was installed but never started, until cancelled at 45 minutes; iOS hit "Connecting to the VM Service timed out". In both, later launches on the same device passed, 10 of 12 overall. `simctl boot` returns before the simulator is ready, so the iOS job now waits with `bootstatus -b`. Android tests get 10 minutes each and dump logcat on failure.
   - The first iOS test still stalled once after that. Its simulator log showed the app running ("The Dart VM service is listening") while `flutter test` never connected: a first-launch flake in the tooling, not an app hang. Each iOS device test now gets 15 minutes and one retry. In the passing run the retry was needed once, for `app_test`, and never for the later tests.
-- **Open: `app_test` with an archive stored.**
-  - On the local emulator, `integration_test/app_test.dart` failed once with an archive present. Its error output was lost when the emulator crashed shortly afterwards, and the emulator then wouldn't boot again, so it couldn't be reproduced.
-  - `test/app_walk_test.dart` runs the same walk on the whole app, with the indexer running, and passes.
-  - The likely cause is timing: the archive had just been re-downloaded, so indexing was probably still running, and `app_test` allows 10 s per step while a phile opens behind index transactions.
-  - Rerun on a device with a complete archive.
+- **`app_test` with an archive stored (resolved):**
+  - It failed on the emulator whenever an archive was present, a path CI never reaches because CI has no archive.
+  - The cause was a race in the test, not the app. After tapping an issue, it waited for "any ListTile", which the library's tiles satisfy while the page transition runs, and then tapped the library's "Issue 72" tile, now covered by the incoming page. Flutter's missed-tap warning said exactly that.
+  - It now finds tiles inside `IssueScreen` and waits for the transition. On the emulator, with all 72 issues stored and indexed, it passes in 6 s.
+  - `test/app_walk_test.dart` covers the same walk on the whole app.
+- **No start-up hang in the app.** A debug build stuck on the splash screen locally (twice) turned out to be the *test* APK. `flutter test integration_test/...` builds into the same `app-debug.apk` path, and that APK waits for a test harness that never connects when it's installed by hand. CI's first-launch stalls were the separate tooling flake above.
 - **Owner actions:**
   - Contact the Phrack staff before public release (spec).
   - Create the Android upload key and the App Store / Play Console listings.
