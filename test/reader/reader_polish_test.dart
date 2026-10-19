@@ -328,7 +328,10 @@ void main() {
 
       await nativePage(tester, 1);
       await tester.pumpAndSettle();
-      expect(offset(), closeTo(844 - layout.lineHeight, layout.lineHeight));
+      expect(
+        offset(),
+        closeTo(844 - readerTopInset - layout.lineHeight, layout.lineHeight),
+      );
 
       await nativePage(tester, -1);
       await tester.pumpAndSettle();

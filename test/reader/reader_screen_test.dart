@@ -101,6 +101,50 @@ void main() {
     expect(_chromeVisible(tester), isTrue);
   });
 
+  testWidgets('a finger drifting back at the end of a drag leaves the '
+      'chrome hidden', (tester) async {
+    await openApp(tester);
+    final gesture = await tester.startGesture(const Offset(200, 600));
+    for (var i = 0; i < 10; i++) {
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(_chromeVisible(tester), isFalse);
+    // Resting before lifting: a few pixels back towards the top.
+    for (var i = 0; i < 4; i++) {
+      await gesture.moveBy(const Offset(0, 5));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(_chromeVisible(tester), isFalse);
+  });
+
+  testWidgets('only a deliberate scroll up brings the chrome back', (
+    tester,
+  ) async {
+    await openApp(tester);
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(_chromeVisible(tester), isFalse);
+
+    await tester.timedDrag(
+      find.byType(ListView),
+      const Offset(0, chromeShowScroll - 24),
+      const Duration(milliseconds: 600),
+    );
+    await tester.pumpAndSettle();
+    expect(_chromeVisible(tester), isFalse, reason: 'a short nudge');
+
+    await tester.timedDrag(
+      find.byType(ListView),
+      const Offset(0, chromeShowScroll + 36),
+      const Duration(milliseconds: 600),
+    );
+    await tester.pumpAndSettle();
+    expect(_chromeVisible(tester), isTrue);
+  });
+
   testWidgets('system bars appearing do not move the text', (tester) async {
     // Landscape with a 3-button nav bar on the right and a status bar: the
     // insets immersive mode removes when the chrome hides.

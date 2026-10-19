@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -180,9 +179,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _setChromeVisible(false);
   }
 
-  void _onVerticalUserScroll(ScrollDirection direction) {
-    // reverse: content moving up, i.e. reading further down.
-    _setChromeVisible(direction == ScrollDirection.forward);
+  /// Scrolling travel in the current direction: positive reads on.
+  double _scrollTravel = 0;
+
+  /// Reading on hides the chrome almost at once. Bringing it back takes a
+  /// deliberate scroll up: a finger resting at the end of a drag drifts a
+  /// few pixels back, and showing the chrome on any upward movement made it
+  /// flicker back while reading.
+  void _onVerticalUserScroll(double delta) {
+    if (delta.sign != _scrollTravel.sign) _scrollTravel = 0;
+    _scrollTravel += delta;
+    if (_scrollTravel >= chromeHideScroll) {
+      _setChromeVisible(false);
+    } else if (_scrollTravel <= -chromeShowScroll) {
+      _setChromeVisible(true);
+    }
   }
 
   @override
@@ -207,19 +218,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             _setChromeVisible(!_chromeVisible);
           }
         },
-        child: ReaderView(
-          key: _readerKey,
-          text: value.text,
-          font: font,
-          foreground: theme.foreground,
-          onVerticalUserScroll: _onVerticalUserScroll,
-          diagnostics: _diagnostics,
-          onPositionChanged: _onPosition,
-          initialPosition: value.position ?? const ReadingPosition.top(),
-          selection: _selection,
-          selectionColor: theme.selection,
-          revealLine: widget.revealLine,
-          highlight: widget.highlight,
+        // Keeps the first line off the screen's edge, which curves away on
+        // edge-display phones held in landscape. The same with the chrome
+        // shown or hidden, so no line moves when it toggles.
+        child: Padding(
+          padding: const EdgeInsets.only(top: readerTopInset),
+          child: ReaderView(
+            key: _readerKey,
+            text: value.text,
+            font: font,
+            foreground: theme.foreground,
+            onVerticalUserScroll: _onVerticalUserScroll,
+            diagnostics: _diagnostics,
+            onPositionChanged: _onPosition,
+            initialPosition: value.position ?? const ReadingPosition.top(),
+            selection: _selection,
+            selectionColor: theme.selection,
+            revealLine: widget.revealLine,
+            highlight: widget.highlight,
+          ),
         ),
       ),
       AsyncError(:final error) => Center(
@@ -670,6 +687,14 @@ class _CopyBar extends StatelessWidget {
     ),
   );
 }
+
+/// Scrolling down this far hides the chrome; scrolling up [chromeShowScroll]
+/// brings it back (logical pixels, in one direction without reversing).
+const double chromeHideScroll = 8;
+const double chromeShowScroll = 64;
+
+/// Space above the first line of text, in logical pixels.
+const double readerTopInset = 12;
 
 /// Volume-button paging is Android-only (spec): iOS gives apps no such hook.
 bool get isAndroid =>

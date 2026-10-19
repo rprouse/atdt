@@ -100,7 +100,10 @@ void main() {
     expect(_reader(tester).position.fractionIntoLine, closeTo(0, 1e-6));
     expect(_chromeVisible(tester), isFalse);
     expect(find.text('--[ 2 - The method'), findsOneWidget);
-    expect(tester.getTopLeft(find.text('--[ 2 - The method')).dy, 0);
+    expect(
+      tester.getTopLeft(find.text('--[ 2 - The method')).dy,
+      readerTopInset,
+    );
   });
 
   testWidgets('the list marks the section being read', (tester) async {
