@@ -19,6 +19,13 @@ class CreditsScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           const ListTile(title: Text('Phrack'), subtitle: Text(phrackCredit)),
+          ListTile(
+            key: const ValueKey('licences'),
+            title: const Text('Licences'),
+            subtitle: const Text('Every open-source package and font licence'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showAtdtLicences(context),
+          ),
           const Divider(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),

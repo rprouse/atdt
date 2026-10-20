@@ -141,7 +141,7 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.favorite_outline),
             title: const Text('Credits'),
-            subtitle: const Text('Phrack, and every font with its licence'),
+            subtitle: const Text('Phrack, fonts, and open-source licences'),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const CreditsScreen()),
             ),
@@ -157,8 +157,8 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('About ATDT'),
-            subtitle: const Text('Version and licences'),
-            onTap: () => showAtdtAbout(context, registry),
+            subtitle: const Text('Source licence and Phrack disclaimer'),
+            onTap: () => showAtdtAbout(context),
           ),
         ],
       ),
