@@ -21,29 +21,28 @@ const phrackCredit =
     'staff; text is downloaded from phrack.org. ATDT is not affiliated with '
     'Phrack.';
 
-void showAtdtAbout(BuildContext context, FontRegistry registry) {
-  final textTheme = Theme.of(context).textTheme;
-  showAboutDialog(
-    context: context,
-    applicationName: 'ATDT',
-    applicationLegalese: 'Source code under the MIT License. $phrackCredit',
-    children: [
-      const SizedBox(height: 16),
-      Text('Fonts', style: textTheme.titleSmall),
-      for (final font in registry.fonts)
-        Padding(
-          key: ValueKey('credit-${font.id}'),
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            '${font.spec.attribution} Licence: ${font.spec.licenceName}.',
-            style: textTheme.bodySmall,
-          ),
-        ),
-      const SizedBox(height: 8),
-      Text(
-        'Full licence texts are under "View licenses" and in Credits.',
-        style: textTheme.bodySmall,
+const _appLegalese = 'Source code under the MIT License.';
+
+/// The licences page, reached from Credits. It lists every package licence
+/// plus the fonts registered by [registerFontLicences].
+void showAtdtLicences(BuildContext context) => showLicensePage(
+  context: context,
+  applicationName: 'ATDT',
+  applicationLegalese: _appLegalese,
+);
+
+/// A plain dialog rather than [showAboutDialog], which always adds a
+/// "View licenses" button; that link lives in Credits instead.
+void showAtdtAbout(BuildContext context) => showDialog<void>(
+  context: context,
+  builder: (context) => AlertDialog(
+    title: const Text('ATDT'),
+    content: const Text('$_appLegalese $phrackCredit'),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: Text(MaterialLocalizations.of(context).closeButtonLabel),
       ),
     ],
-  );
-}
+  ),
+);

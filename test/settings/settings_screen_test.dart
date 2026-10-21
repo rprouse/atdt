@@ -138,14 +138,24 @@ void main() {
     expect(find.textContaining('freely provided to end users'), findsOneWidget);
   });
 
-  testWidgets('About lists a credit for every font', (tester) async {
+  testWidgets('About carries no font credits or licences link', (tester) async {
     await _pump(tester);
     await tester.tap(find.text('About ATDT'));
     await tester.pumpAndSettle();
 
+    expect(find.textContaining('not affiliated with Phrack'), findsOneWidget);
+    expect(find.textContaining('MIT License'), findsOneWidget);
     for (final font in testFonts.fonts) {
-      expect(find.byKey(ValueKey('credit-${font.id}')), findsOneWidget);
+      expect(find.textContaining(font.spec.attribution), findsNothing);
     }
+    expect(find.textContaining('View licenses'), findsNothing);
+  });
+
+  testWidgets('Credits opens the licences page', (tester) async {
+    await _pump(tester, home: const CreditsScreen());
+    await tester.tap(find.byKey(const ValueKey('licences')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LicensePage), findsOneWidget);
   });
 
   testWidgets('font licences are registered from the manifest', (tester) async {
